@@ -3,8 +3,8 @@ package it.polimi.middleware.jms.model;
 public class IdDistributor {
 	private int nextId;
 	
-	public IdDistributor() {
-		nextId = 1;
+	public IdDistributor(int firstId) {
+		nextId = firstId;
 	}
 
 	public synchronized int getNewId() {
