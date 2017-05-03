@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model;
+package it.polimi.middleware.jms.model.message;
 
 public class MessageProperty {
 	private String propertyName;

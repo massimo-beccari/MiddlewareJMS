@@ -1,7 +1,7 @@
 package it.polimi.middleware.jms;
 
-import it.polimi.middleware.jms.model.MessageProperty;
-import it.polimi.middleware.jms.model.message.GeneralMessage;
+import it.polimi.middleware.jms.model.message.MessageInterface;
+import it.polimi.middleware.jms.model.message.MessageProperty;
 
 import java.util.List;
 import java.util.Properties;
@@ -25,12 +25,19 @@ public class Utils {
 		return new InitialContext(props);
 	}
 	
-	public static void sendMessage(JMSContext jmsContext, GeneralMessage message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties) throws JMSException {
+	public static String sendMessage(JMSContext jmsContext, MessageInterface message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties) throws JMSException {
 		ObjectMessage objMessage = jmsContext.createObjectMessage();
 		objMessage.setObject(message);
 		if(properties != null)
 			for(MessageProperty mp : properties)
 				objMessage.setStringProperty(mp.getPropertyName(), mp.getPropertyValue());
 		jmsProducer.send(destination, objMessage);
+		return objMessage.getJMSMessageID();
+	}
+	
+	public static byte[] createImageThumbnail(byte[] image) {
+		byte[] thumbnail = image.clone();
+		//TODO
+		return thumbnail;
 	}
 }

@@ -1,5 +1,8 @@
 package it.polimi.middleware.jms;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -20,7 +23,9 @@ import it.polimi.middleware.jms.model.message.ResponseMessage;
 
 public class Server implements MessageListener {
 	private IdDistributor userIdDistributor;
-	private HashMap<String, User> usersMap;
+	private HashMap<Integer, User> usersMapId;
+	private HashMap<String, User> usersMapUsername;
+	private HashMap<Integer, UserQueueDaemon> daemonsMap;
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private JMSProducer jmsProducer;
@@ -28,7 +33,9 @@ public class Server implements MessageListener {
 	
 	public Server() {
 		userIdDistributor = new IdDistributor(1);
-		usersMap = new HashMap<String, User>();
+		usersMapId = new HashMap<Integer, User>();
+		usersMapUsername = new HashMap<String, User>();
+		daemonsMap = new HashMap<Integer, UserQueueDaemon>();
 	}
 	
 	public void startServer() throws NamingException {
@@ -46,9 +53,13 @@ public class Server implements MessageListener {
 
 	public static void main(String[] args) {
 		Server server = new Server();
+		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 		try {
 			server.startServer();
+			bufferedReader.readLine();
 		} catch (NamingException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -66,6 +77,18 @@ public class Server implements MessageListener {
 			case Constants.REQUEST_LOGIN:
 				manageLogin(request, responseQueue);
 				break;
+				
+			case Constants.REQUEST_UNREGISTER:
+				
+				break;
+				
+			case Constants.REQUEST_LOGOUT:
+				
+				break;
+				
+			case Constants.REQUEST_FOLLOW:
+				manageFollow(request, responseQueue);
+				break;
 			}
 		} catch (JMSException e) {
 			e.printStackTrace();
@@ -79,13 +102,15 @@ public class Server implements MessageListener {
 		if(params != null && params.size() == 2) {
 			username = params.get(0);
 			password = params.get(1);
-			if(!(usersMap.containsKey(username))) {
+			if(!(usersMapUsername.containsKey(username))) {
 				userId = userIdDistributor.getNewId();
 				User newUser = new User(userId, username, password);
-				usersMap.put(username, newUser);
-				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_OK, null);
+				usersMapId.put(userId, newUser);
+				usersMapUsername.put(username, newUser);
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_OK, "" + userId);
 				jmsProducer.send(responseQueue, response);
-				runHandler(newUser);
+				runHandler(userId);
+				runDaemon(userId);
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_ALREADY_EXISTS);
 				jmsProducer.send(responseQueue, response);
@@ -102,11 +127,11 @@ public class Server implements MessageListener {
 		if(params != null && params.size() == 2) {
 			username = params.get(0);
 			password = params.get(1);
-			User user = usersMap.get(username);
+			User user = usersMapUsername.get(username);
 			if(user != null && password.equals(user.getPassword())) {
-				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_OK, null);
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_OK, "" + user.getUserId());
 				jmsProducer.send(responseQueue, response);
-				runHandler(user);
+				runHandler(user.getUserId());
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_AUTHENTICATION);
 				jmsProducer.send(responseQueue, response);
@@ -117,9 +142,47 @@ public class Server implements MessageListener {
 		}
 	}
 	
-	private void runHandler(User user) {
-		UserHandler handler = new UserHandler(user);
+	private void runHandler(int userId) {
+		UserHandler handler = new UserHandler(userId);
 		Thread t = new Thread(handler);
 		t.start();
+	}
+	
+	private void runDaemon(int userId) {
+		UserQueueDaemon daemon = new UserQueueDaemon(userId);
+		daemonsMap.put(userId, daemon);
+		Thread t = new Thread(daemon);
+		t.start();
+	}
+	
+	private void manageFollow(RequestMessage request, Queue responseQueue) {
+		ArrayList<String> params = request.getRequestParams();
+		if(params != null && params.size() == 1) {
+			String followedUsername = params.get(0);
+			if(usersMapUsername.containsKey(followedUsername) && !(usersMapId.get(request.getUserId()).getUsername().equals(followedUsername))) {
+				UserQueueDaemon daemon = daemonsMap.get(request.getUserId());
+				synchronized(daemon) {
+					daemon.setNewSubscription(true);
+					try {
+						daemon.wait();
+						daemon.addSubscription(usersMapUsername.get(followedUsername).getUserId());
+						daemon.setNewSubscription(false);
+						daemon.notify();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (NamingException e) {
+						e.printStackTrace();
+					}
+				}
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_OK, null);
+				jmsProducer.send(responseQueue, response);
+			} else {
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_USERNAME);
+				jmsProducer.send(responseQueue, response);
+			}
+		} else {
+			ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_BAD_PARAMS);
+			jmsProducer.send(responseQueue, response);
+		}
 	}
 }

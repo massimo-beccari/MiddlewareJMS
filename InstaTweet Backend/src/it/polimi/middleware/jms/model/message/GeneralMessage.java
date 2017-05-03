@@ -2,9 +2,7 @@ package it.polimi.middleware.jms.model.message;
 
 import it.polimi.middleware.jms.Constants;
 
-import java.io.Serializable;
-
-public class GeneralMessage implements Serializable {
+public class GeneralMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;
 	private int userId;
 	private String text;

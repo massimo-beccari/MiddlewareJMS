@@ -1,3 +1,4 @@
 REQUESTS PARAMETERS
-registration: username password
-login: username password
+registration: username password -> RESPONSE: OK, userId
+login: username password -> RESPONSE: OK, userId
+follow: followedUsername -> RESPONSE: OK, null
