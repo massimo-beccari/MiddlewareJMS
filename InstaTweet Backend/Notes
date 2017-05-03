@@ -2,3 +2,4 @@ REQUESTS PARAMETERS
 registration: username password -> RESPONSE: OK, userId
 login: username password -> RESPONSE: OK, userId
 follow: followedUsername -> RESPONSE: OK, null
+post: text image_file_path

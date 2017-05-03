@@ -11,6 +11,7 @@ import javax.jms.JMSContext;
 import javax.jms.JMSException;
 import javax.jms.JMSProducer;
 import javax.jms.ObjectMessage;
+import javax.jms.Queue;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -25,17 +26,19 @@ public class Utils {
 		return new InitialContext(props);
 	}
 	
-	public static String sendMessage(JMSContext jmsContext, MessageInterface message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties) throws JMSException {
+	public static String sendMessage(JMSContext jmsContext, MessageInterface message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties, Queue responseQueue) throws JMSException {
 		ObjectMessage objMessage = jmsContext.createObjectMessage();
 		objMessage.setObject(message);
 		if(properties != null)
 			for(MessageProperty mp : properties)
 				objMessage.setStringProperty(mp.getPropertyName(), mp.getPropertyValue());
+		if(responseQueue != null)
+			objMessage.setJMSReplyTo(responseQueue);
 		jmsProducer.send(destination, objMessage);
 		return objMessage.getJMSMessageID();
 	}
 	
-	public static byte[] createImageThumbnail(byte[] image) {
+	public static byte[] createImageThumbnail(byte[] image, String extension) {
 		byte[] thumbnail = image.clone();
 		//TODO
 		return thumbnail;

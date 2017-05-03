@@ -6,12 +6,14 @@ public class GeneralMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;
 	private int userId;
 	private String text;
+	private String imageExtension;
 	private byte[] image;
 	private int type;
 	
-	public GeneralMessage(int userId, String text, byte[] image) {
+	public GeneralMessage(int userId, String text, String imageExtension, byte[] image) {
 		this.userId = userId;
 		this.text = text;
+		this.imageExtension = imageExtension;
 		this.image = image;
 		if(text == null)
 			type = Constants.MESSAGE_ONLY_IMAGE;
@@ -27,6 +29,10 @@ public class GeneralMessage implements MessageInterface {
 
 	public String getText() {
 		return text;
+	}
+
+	public String getImageExtension() {
+		return imageExtension;
 	}
 
 	public byte[] getImage() {

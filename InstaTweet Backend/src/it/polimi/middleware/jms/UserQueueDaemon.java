@@ -15,6 +15,8 @@ import javax.naming.Context;
 import javax.naming.NamingException;
 
 import it.polimi.middleware.jms.model.message.GeneralMessage;
+import it.polimi.middleware.jms.model.message.ImageMessage;
+import it.polimi.middleware.jms.model.message.MessageInterface;
 import it.polimi.middleware.jms.model.message.MessageProperty;
 
 public class UserQueueDaemon implements Runnable {
@@ -22,6 +24,7 @@ public class UserQueueDaemon implements Runnable {
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue userMessagesQueue;
+	private Queue userImagesQueue;
 	private JMSProducer jmsProducer;
 	private ArrayList<JMSConsumer> subscriptionsConsumers;
 	private boolean newSubscription;
@@ -43,7 +46,8 @@ public class UserQueueDaemon implements Runnable {
 
 	private void setup() throws NamingException {
 		createContexts();
-		userMessagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_PREFIX + userId);
+		userMessagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_MESSAGES_PREFIX + userId);
+		userImagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
 		jmsProducer = jmsContext.createProducer();
 	}
 	
@@ -81,30 +85,41 @@ public class UserQueueDaemon implements Runnable {
 	}
 
 	private void onMessage(Message message) {
+		MessageInterface msg;
+		ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
+		//set properties
 		try {
-			GeneralMessage msg = message.getBody(GeneralMessage.class);
-			//set properties
 			@SuppressWarnings("unchecked")
 			Enumeration<String> propertyNames = message.getPropertyNames();
-			ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
 			while(propertyNames.hasMoreElements()) {
 				String propertyName = propertyNames.nextElement();
 				messageProperties.add(new MessageProperty(propertyName, message.getStringProperty(propertyName)));
 			}
-			//forward message to queue
-			Utils.sendMessage(jmsContext, msg, jmsProducer, userMessagesQueue, messageProperties);
 		} catch (JMSException e) {
 			e.printStackTrace();
+		}
+		//send message
+		try {
+			msg = message.getBody(GeneralMessage.class);//forward message to queue
+			Utils.sendMessage(jmsContext, msg, jmsProducer, userMessagesQueue, messageProperties, null);
+		} catch (JMSException e) {
+			//if this exception is thrown, the message is an image message
+			try {
+				msg = message.getBody(ImageMessage.class);//forward message to queue
+				Utils.sendMessage(jmsContext, msg, jmsProducer, userImagesQueue, messageProperties, null);
+			} catch (JMSException e1) {
+				e1.printStackTrace();
+			}
 		}
 	}
 	
 	public void addSubscription(int followedUserId) throws NamingException {
 		Topic newMessageTopic, newImageTopic;
-		newMessageTopic = (Topic) initialContext.lookup(Constants.TOPIC_USER_PREFIX + followedUserId);
+		newMessageTopic = (Topic) initialContext.lookup(Constants.TOPIC_USER_MESSAGES_PREFIX + followedUserId);
 		newImageTopic = (Topic) initialContext.lookup(Constants.TOPIC_USER_IMAGES_PREFIX + followedUserId);
 		JMSConsumer newMessageConsumer, newImageConsumer;
-		newMessageConsumer = jmsContext.createDurableConsumer(newMessageTopic, Constants.TOPIC_SUBSCRIPTION_PREFIX + userId + "_" + followedUserId);
-		newImageConsumer = jmsContext.createDurableConsumer(newImageTopic, Constants.TOPIC_SUBSCRIPTION_PREFIX + "IMAGE_" + userId + "_" + followedUserId);
+		newMessageConsumer = jmsContext.createDurableConsumer(newMessageTopic, Constants.TOPIC_SUBSCRIPTION_MESSAGES_PREFIX + userId + "_" + followedUserId);
+		newImageConsumer = jmsContext.createDurableConsumer(newImageTopic, Constants.TOPIC_SUBSCRIPTION_IMAGES_PREFIX + userId + "_" + followedUserId);
 		subscriptionsConsumers.add(newMessageConsumer);
 		subscriptionsConsumers.add(newImageConsumer);
 	}

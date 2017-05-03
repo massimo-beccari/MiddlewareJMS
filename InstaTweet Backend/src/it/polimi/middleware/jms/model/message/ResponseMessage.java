@@ -1,8 +1,6 @@
 package it.polimi.middleware.jms.model.message;
 
-import java.io.Serializable;
-
-public class ResponseMessage implements Serializable {
+public class ResponseMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;
 	private int responseCode;
 	private String responseInfo;

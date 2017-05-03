@@ -51,11 +51,11 @@ public class UserHandler implements Runnable {
 	private void createContexts() throws NamingException {
 		initialContext = Utils.getContext();
 		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
-		jmsContext.setClientID(userId + "");
+		jmsContext.setClientID("HANDLER_" + userId);
 	}
 	
 	private void createUserDestinations() {
-		userMessageTopic = jmsContext.createTopic(Constants.TOPIC_USER_PREFIX + userId);
+		userMessageTopic = jmsContext.createTopic(Constants.TOPIC_USER_MESSAGES_PREFIX + userId);
 		userImageTopic = jmsContext.createTopic(Constants.TOPIC_USER_IMAGES_PREFIX + userId);
 		queueFromUser = jmsContext.createQueue(Constants.QUEUE_FROM_USER_PREFIX + userId);
 		jmsConsumer = jmsContext.createConsumer(queueFromUser);
@@ -85,16 +85,16 @@ public class UserHandler implements Runnable {
 		ArrayList<MessageProperty> properties = new ArrayList<MessageProperty>();
 		properties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
 		try {
-			Utils.sendMessage(jmsContext, message, jmsProducer, userMessageTopic, properties);
+			Utils.sendMessage(jmsContext, message, jmsProducer, userMessageTopic, properties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
 	}
 	
 	private void processMessageWithImage(GeneralMessage message) {
-		byte[] thumbnail = Utils.createImageThumbnail(message.getImage());
-		GeneralMessage messageWithThumbnail = new GeneralMessage(userId, message.getText(), thumbnail);
-		ImageMessage imageMessage = new ImageMessage(userId, message.getImage());
+		byte[] thumbnail = Utils.createImageThumbnail(message.getImage(), message.getImageExtension());
+		GeneralMessage messageWithThumbnail = new GeneralMessage(userId, message.getText(), message.getImageExtension(), thumbnail);
+		ImageMessage imageMessage = new ImageMessage(userId, message.getImageExtension(), message.getImage());
 		//create properties for messages
 		ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
 		messageProperties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
@@ -102,9 +102,9 @@ public class UserHandler implements Runnable {
 		imageProperties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
 		//send messages
 		try {
-			String imageMessageId = Utils.sendMessage(jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties);
+			String imageMessageId = Utils.sendMessage(jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties, null);
 			messageProperties.add(new MessageProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID, imageMessageId));
-			Utils.sendMessage(jmsContext, messageWithThumbnail, jmsProducer, userMessageTopic, messageProperties);
+			Utils.sendMessage(jmsContext, messageWithThumbnail, jmsProducer, userMessageTopic, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
