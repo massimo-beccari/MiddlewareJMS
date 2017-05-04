@@ -30,7 +30,6 @@ public class Client {
 	private Queue responseQueue;
 	private Queue uploadQueue;
 	private Queue messageQueue;
-	private Queue imageQueue;
 	private boolean logged;
 	private int userId;
 	private String username;
@@ -120,8 +119,7 @@ public class Client {
 	private void setupQueues() {
 		try {
 			uploadQueue = (Queue) initialContext.lookup(Constants.QUEUE_FROM_USER_PREFIX + userId);
-			messageQueue = (Queue) initialContext.lookup(Constants.QUEUE_TO_USER_MESSAGES_PREFIX + userId);
-			imageQueue = (Queue) initialContext.lookup(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
+			messageQueue = (Queue) initialContext.lookup(Constants.QUEUE_GET_USER_PREFIX + userId);
 		} catch (NamingException e) {
 			e.printStackTrace();
 		}

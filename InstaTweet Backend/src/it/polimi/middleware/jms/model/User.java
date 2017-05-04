@@ -1,19 +1,20 @@
 package it.polimi.middleware.jms.model;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 
 public class User {
 	private int userId;
 	private String username;
 	private String password;
-	private ArrayList<User> followedUsers;
+	private ArrayList<Integer> followedUsers;
+	private long lastMessageReadTimestamp;
 	
 	public User(int userId, String username, String password) {
 		this.userId = userId;
 		this.username = username;
 		this.password = password;
-		followedUsers = new ArrayList<User>();
+		followedUsers = new ArrayList<Integer>();
+		lastMessageReadTimestamp = 0;
 	}
 
 	public String getPassword() {
@@ -32,11 +33,21 @@ public class User {
 		return username;
 	}
 	
-	public Iterator<User> getFollowedIterator() {
-		return followedUsers.iterator();
+	public synchronized ArrayList<Integer> getFollowedUsers() {
+		 ArrayList<Integer> copy = new ArrayList<Integer>();
+		 copy.addAll(followedUsers);
+		return copy;
 	}
 	
-	public void addFollowed(User user) {
-		followedUsers.add(user);
+	public synchronized void addFollowed(int userId) {
+		followedUsers.add(userId);
+	}
+	
+	public synchronized long getLastMessageReadTimestamp() {
+		return lastMessageReadTimestamp;
+	}
+	
+	public synchronized void setLastMessageReadTimestamp(long lastMessageReadTimestamp) {
+		this.lastMessageReadTimestamp = lastMessageReadTimestamp;
 	}
 }
