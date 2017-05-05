@@ -2,6 +2,7 @@ package it.polimi.middleware.jms;
 
 import java.util.ArrayList;
 
+import it.polimi.middleware.jms.model.IdDistributor;
 import it.polimi.middleware.jms.model.message.GeneralMessage;
 import it.polimi.middleware.jms.model.message.ImageMessage;
 import it.polimi.middleware.jms.model.message.MessageProperty;
@@ -20,6 +21,7 @@ import javax.naming.NamingException;
 public class UserHandler implements Runnable {
 	private boolean isConnected;
 	private int userId;
+	private IdDistributor messageIdDistributor;
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue queueFromUser;
@@ -28,13 +30,9 @@ public class UserHandler implements Runnable {
 	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
 	
-	public UserHandler(int userId) {
+	public UserHandler(int userId, IdDistributor messageIdDistributor) {
 		this.userId = userId;
-		try {
-			setup();
-		} catch (NamingException e) {
-			e.printStackTrace();
-		}
+		this.messageIdDistributor = messageIdDistributor;
 		isConnected = true;
 	}
 	
@@ -67,17 +65,27 @@ public class UserHandler implements Runnable {
 	
 	@Override
 	public void run() {
-		while(isConnected) {
-			Message msg  = jmsConsumer.receive();
-			try {
-				GeneralMessage message = msg.getBody(GeneralMessage.class);
-				if(message.getType() == Constants.MESSAGE_ONLY_TEXT)
-					processTextMessage(message);
-				else
-					processMessageWithImage(message);
-			} catch (JMSException e) {
-				e.printStackTrace();
+		try {
+			setup();
+			System.out.println("UH" + userId + ": user handler started.");
+			while(isConnected) {
+				Message msg  = jmsConsumer.receive();
+				System.out.println("UH" + userId + ": message received.");
+				try {
+					GeneralMessage message = msg.getBody(GeneralMessage.class);
+					if(message.getType() == Constants.MESSAGE_ONLY_TEXT) {
+						processTextMessage(message);
+						System.out.println("UH" + userId + ": text message processed.");
+					} else {
+						processMessageWithImage(message);
+						System.out.println("UH" + userId + ": text/image message processed.");
+					}
+				} catch (JMSException e) {
+					e.printStackTrace();
+				}
 			}
+		} catch (NamingException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -85,7 +93,7 @@ public class UserHandler implements Runnable {
 		ArrayList<MessageProperty> properties = new ArrayList<MessageProperty>();
 		properties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
 		try {
-			Utils.sendMessage(jmsContext, message, jmsProducer, userMessageTopic, properties, null);
+			Utils.sendMessage(messageIdDistributor, jmsContext, message, jmsProducer, userMessageTopic, properties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
@@ -102,9 +110,9 @@ public class UserHandler implements Runnable {
 		imageProperties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
 		//send messages
 		try {
-			String imageMessageId = Utils.sendMessage(jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties, null);
+			String imageMessageId = Utils.sendMessage(messageIdDistributor, jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties, null);
 			messageProperties.add(new MessageProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID, imageMessageId));
-			Utils.sendMessage(jmsContext, messageWithThumbnail, jmsProducer, userMessageTopic, messageProperties, null);
+			Utils.sendMessage(messageIdDistributor, jmsContext, messageWithThumbnail, jmsProducer, userMessageTopic, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}

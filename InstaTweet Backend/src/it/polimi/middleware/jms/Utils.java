@@ -1,8 +1,10 @@
 package it.polimi.middleware.jms;
 
+import it.polimi.middleware.jms.model.IdDistributor;
 import it.polimi.middleware.jms.model.message.MessageInterface;
 import it.polimi.middleware.jms.model.message.MessageProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -30,16 +32,25 @@ public class Utils {
 		return new InitialContext(props);
 	}
 	
-	public static String sendMessage(JMSContext jmsContext, MessageInterface message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties, Queue responseQueue) throws JMSException {
+	public static String sendMessage(IdDistributor messageIdDistributor, JMSContext jmsContext, MessageInterface message, JMSProducer jmsProducer, Destination destination, List<MessageProperty> properties, Queue responseQueue) throws JMSException {
 		ObjectMessage objMessage = jmsContext.createObjectMessage();
 		objMessage.setObject(message);
-		if(properties != null)
+		String messageId = null;
+		if(messageIdDistributor != null) {
+			int mId = messageIdDistributor.getNewId();
+			messageId = Constants.JMS_PROPERTY_MESSAGE_ID_PREFIX + mId;
+			if(properties == null)
+				properties = new ArrayList<MessageProperty>();
+			properties.add(new MessageProperty(Constants.PROPERTY_MESSAGE_ID, messageId));
+		}
+		if(properties != null) {
 			for(MessageProperty mp : properties)
 				objMessage.setStringProperty(mp.getPropertyName(), mp.getPropertyValue());
+		}
 		if(responseQueue != null)
 			objMessage.setJMSReplyTo(responseQueue);
 		jmsProducer.send(destination, objMessage);
-		return objMessage.getJMSMessageID();
+		return messageId;
 	}
 	
 	public static byte[] createImageThumbnail(byte[] image, String extension) {

@@ -14,12 +14,15 @@ import javax.jms.Topic;
 import javax.naming.Context;
 import javax.naming.NamingException;
 
+import it.polimi.middleware.jms.model.IdDistributor;
 import it.polimi.middleware.jms.model.message.GeneralMessage;
 import it.polimi.middleware.jms.model.message.ImageMessage;
 import it.polimi.middleware.jms.model.message.MessageProperty;
 
 public class UserQueueDaemon implements Runnable {
 	private int userId;
+	@SuppressWarnings("unused")
+	private IdDistributor messageIdDistributor;
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue userMessagesQueue;
@@ -29,16 +32,12 @@ public class UserQueueDaemon implements Runnable {
 	private ArrayList<JMSConsumer> imageConsumers;
 	private boolean iWait;
 
-	public UserQueueDaemon(int userId) {
+	public UserQueueDaemon(int userId, IdDistributor messageIdDistributor) {
 		this.userId = userId;
+		this.messageIdDistributor = messageIdDistributor;
 		messageConsumers = new ArrayList<JMSConsumer>();
 		imageConsumers = new ArrayList<JMSConsumer>();
 		iWait = false;
-		try {
-			setup();
-		} catch (NamingException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	/*
@@ -64,30 +63,42 @@ public class UserQueueDaemon implements Runnable {
 	
 	@Override
 	public void run() {
-		while(true) {
-			synchronized(this) {
-				try {
-					//if new subscription, wake server and wait it adds new subscription
-					while(iWait) {
-						notify();
-						wait();
+		try {
+			setup();
+			System.out.println("QD" + userId + ": queue daemon started.");
+			while(true) {
+				synchronized(this) {
+					try {
+						//if new subscription, wake server and wait it adds new subscription
+						while(iWait) {
+							notify();
+							wait();
+						}
+						//check messages
+						for(JMSConsumer consumer : messageConsumers) {
+							Message message = consumer.receiveNoWait();
+							if(message != null) {
+								System.out.println("QD" + userId + ": message received.");
+								onMessage(message);
+								System.out.println("QD" + userId + ": message forwarded.");
+							}
+						}
+						//check images
+						for(JMSConsumer consumer : imageConsumers) {
+							Message message = consumer.receiveNoWait();
+							if(message != null) {
+								System.out.println("QD" + userId + ": message received.");
+								onImage(message);
+								System.out.println("QD" + userId + ": message forwarded.");
+							}
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
 					}
-					//check messages
-					for(JMSConsumer consumer : messageConsumers) {
-						Message message = consumer.receiveNoWait();
-						if(message != null)
-							onMessage(message);
-					}
-					//check images
-					for(JMSConsumer consumer : imageConsumers) {
-						Message message = consumer.receiveNoWait();
-						if(message != null)
-							onImage(message);
-					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			}
+		} catch (NamingException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -103,7 +114,7 @@ public class UserQueueDaemon implements Runnable {
 			}
 			//send message
 			GeneralMessage msg = message.getBody(GeneralMessage.class);//forward message to queue
-			Utils.sendMessage(jmsContext, msg, jmsProducer, userMessagesQueue, messageProperties, null);
+			Utils.sendMessage(null, jmsContext, msg, jmsProducer, userMessagesQueue, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
@@ -121,7 +132,7 @@ public class UserQueueDaemon implements Runnable {
 			}
 			//send message
 			ImageMessage msg = message.getBody(ImageMessage.class);//forward message to queue
-			Utils.sendMessage(jmsContext, msg, jmsProducer, userImagesQueue, messageProperties, null);
+			Utils.sendMessage(null, jmsContext, msg, jmsProducer, userImagesQueue, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
@@ -129,13 +140,14 @@ public class UserQueueDaemon implements Runnable {
 	
 	public void addSubscription(int followedUserId) throws NamingException {
 		Topic newMessageTopic, newImageTopic;
-		newMessageTopic = (Topic) initialContext.lookup(Constants.TOPIC_USER_MESSAGES_PREFIX + followedUserId);
-		newImageTopic = (Topic) initialContext.lookup(Constants.TOPIC_USER_IMAGES_PREFIX + followedUserId);
+		newMessageTopic = jmsContext.createTopic(Constants.TOPIC_USER_MESSAGES_PREFIX + followedUserId);
+		newImageTopic = jmsContext.createTopic(Constants.TOPIC_USER_IMAGES_PREFIX + followedUserId);
 		JMSConsumer newMessageConsumer, newImageConsumer;
 		newMessageConsumer = jmsContext.createDurableConsumer(newMessageTopic, Constants.TOPIC_SUBSCRIPTION_MESSAGES_PREFIX + userId + "_" + followedUserId);
 		newImageConsumer = jmsContext.createDurableConsumer(newImageTopic, Constants.TOPIC_SUBSCRIPTION_IMAGES_PREFIX + userId + "_" + followedUserId);
 		messageConsumers.add(newMessageConsumer);
 		imageConsumers.add(newImageConsumer);
+		System.out.println("QD" + userId + ": subscription added to user " + followedUserId + ".");
 	}
 	
 	public void setNewSubscription(boolean newSubscription) {

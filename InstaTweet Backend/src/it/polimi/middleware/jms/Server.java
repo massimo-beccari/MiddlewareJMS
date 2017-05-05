@@ -22,6 +22,7 @@ import javax.naming.NamingException;
 public class Server {
 	private int currentNumberOfServerInstances;
 	private IdDistributor userIdDistributor;
+	private IdDistributor messageIdDistributor;
 	private HashMap<Integer, User> usersMapId;
 	private HashMap<String, User> usersMapUsername;
 	private HashMap<Integer, UserQueueDaemon> daemonsMap;
@@ -37,6 +38,7 @@ public class Server {
 	private Server() {
 		currentNumberOfServerInstances = 0;
 		userIdDistributor = new IdDistributor(1);
+		messageIdDistributor = new IdDistributor(1);
 		usersMapId = new HashMap<Integer, User>();
 		usersMapUsername = new HashMap<String, User>();
 		daemonsMap = new HashMap<Integer, UserQueueDaemon>();
@@ -46,11 +48,7 @@ public class Server {
 	
 	private void startServer() throws NamingException {
 		createContexts();
-		try {
-			requestsQueue = (Queue) initialContext.lookup(Constants.QUEUE_REQUESTS_NAME);
-		} catch(NamingException e) {
-			requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
-		}
+		requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
 		jmsConsumer = jmsContext.createConsumer(requestsQueue);
 		browser = jmsContext.createBrowser(requestsQueue);
 		System.out.println("SRV: server started.");
@@ -65,9 +63,9 @@ public class Server {
 	}
 	
 	private void startNewServerInstance() {
-		ServerInstance firstInstance = new ServerInstance(currentNumberOfServerInstances,
-				userIdDistributor, usersMapId, usersMapUsername, daemonsMap);
 		currentNumberOfServerInstances++;
+		ServerInstance firstInstance = new ServerInstance(currentNumberOfServerInstances,
+				userIdDistributor, messageIdDistributor, usersMapId, usersMapUsername, daemonsMap);
 		serverInstances.add(firstInstance);
 		executor.submit(firstInstance);
 		System.out.println("SRV: new server instance launched. (" + currentNumberOfServerInstances + ")");
@@ -120,6 +118,7 @@ public class Server {
 						si.notify();
 					}
 					messageProcessed = true;
+					System.out.println("SRV: request delivered to #" + si.getSERVER_INSTANCE_NUMBER() + " server instance");
 				}
 			}
 			/*

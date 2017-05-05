@@ -1,5 +1,6 @@
 package it.polimi.middleware.jms;
 
+import it.polimi.middleware.jms.model.MyTime;
 import it.polimi.middleware.jms.model.message.GeneralMessage;
 import it.polimi.middleware.jms.model.message.ImageMessage;
 import it.polimi.middleware.jms.model.message.RequestMessage;
@@ -64,7 +65,7 @@ public class Client {
 		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
 		if(logged)
 			jmsContext.setClientID("CLIENT_" + userId);
-		requestsQueue = (Queue) initialContext.lookup(Constants.QUEUE_REQUESTS_NAME);
+		requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
 		responseQueue = jmsContext.createTemporaryQueue();
 		responseConsumer = jmsContext.createConsumer(responseQueue);
 		jmsProducer = jmsContext.createProducer();
@@ -80,7 +81,7 @@ public class Client {
 		params.add(password);
 		RequestMessage request = new RequestMessage(userId, Constants.REQUEST_REGISTER, params);
 		try {
-			Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+			Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 			Message msg = responseConsumer.receive();
 			ResponseMessage response = msg.getBody(ResponseMessage.class);
 			if(response.getResponseCode() == Constants.RESPONSE_OK) {
@@ -102,7 +103,7 @@ public class Client {
 		params.add(password);
 		RequestMessage request = new RequestMessage(userId, Constants.REQUEST_LOGIN, params);
 		try {
-			Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+			Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 			Message msg = responseConsumer.receive();
 			ResponseMessage response = msg.getBody(ResponseMessage.class);
 			if(response.getResponseCode() == Constants.RESPONSE_OK) {
@@ -124,12 +125,8 @@ public class Client {
 	}
 	
 	private void setupQueues() {
-		try {
-			uploadQueue = (Queue) initialContext.lookup(Constants.QUEUE_FROM_USER_PREFIX + userId);
-			messageQueue = (Queue) initialContext.lookup(Constants.QUEUE_GET_USER_PREFIX + userId);
-		} catch (NamingException e) {
-			e.printStackTrace();
-		}
+		uploadQueue = jmsContext.createQueue(Constants.QUEUE_FROM_USER_PREFIX + userId);
+		messageQueue = jmsContext.createQueue(Constants.QUEUE_GET_USER_PREFIX + userId);
 	}
 	
 	private void follow(String followedUsername) {
@@ -138,7 +135,7 @@ public class Client {
 			params.add(followedUsername);
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_FOLLOW, params);
 			try {
-				Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 				Message msg = responseConsumer.receive();
 				ResponseMessage response = msg.getBody(ResponseMessage.class);
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
@@ -165,7 +162,7 @@ public class Client {
 					imageFile.close();
 				}
 				GeneralMessage message = new GeneralMessage(userId, text, extension, image);
-				Utils.sendMessage(jmsContext, message, jmsProducer, uploadQueue, null, null);
+				Utils.sendMessage(null, jmsContext, message, jmsProducer, uploadQueue, null, null);
 			} catch (FileNotFoundException e) {
 				System.out.println("Error: file " + imageFilePath + " not found.");
 			} catch (IOException e) {
@@ -183,7 +180,7 @@ public class Client {
 			params.add(Constants.REQUEST_GET_ALL_NEW + "");
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_GET, params);
 			try {
-				Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 				Message msg = responseConsumer.receive();
 				ResponseMessage response = msg.getBody(ResponseMessage.class);
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
@@ -200,21 +197,23 @@ public class Client {
 			System.out.println("Error: you are not logged in. First login to the system.");
 	}
 
-	private void manageGetInterval(String i, String j) {
+	private void manageGetInterval(long i, long j) {
 		if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(Constants.REQUEST_GET_FROM_I_TO_J + "");
-			params.add(i);
-			params.add(j);
+			params.add(i + "");
+			params.add(j + "");
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_GET, params);
 			try {
-				Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 				Message msg = responseConsumer.receive();
 				ResponseMessage response = msg.getBody(ResponseMessage.class);
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
 					System.out.println("Response: OK. Getting messages...");
 					getMessagesFromQueue(1);
-				} else
+				} else if(response.getResponseCode() == Constants.RESPONSE_WARNING)
+					System.out.println("Response: WARNING: " + response.getResponseInfo());
+				else
 					System.out.println("Response: ERROR: " + response.getResponseInfo());
 			} catch (JMSException e) {
 				e.printStackTrace();
@@ -230,7 +229,7 @@ public class Client {
 			params.add(messageId);
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_GET, params);
 			try {
-				Utils.sendMessage(jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
 				Message msg = responseConsumer.receive();
 				ResponseMessage response = msg.getBody(ResponseMessage.class);
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
@@ -256,7 +255,7 @@ public class Client {
 					message = msg.getBody(GeneralMessage.class);
 					switch(message.getType()) {
 					case Constants.MESSAGE_ONLY_TEXT:
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID), message.getText());
+						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_MESSAGE_ID), message.getText());
 						break;
 						
 					case Constants.MESSAGE_ONLY_IMAGE:
@@ -264,7 +263,9 @@ public class Client {
 						break;
 						
 					case Constants.MESSAGE_TEXT_AND_IMAGE:
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID), message.getText());
+						//TODO
+						System.out.println("IMG_ID "+msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID));
+						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_MESSAGE_ID), message.getText());
 						displayImageMessage(message.getImage(), message.getImageExtension());
 						break;
 					}
@@ -301,11 +302,11 @@ public class Client {
 				 @Override
 				 protected void paintComponent(Graphics g) {
 					 super.paintComponent(g);
-				     g.drawImage(img, 0, 0, img.getWidth(), img.getHeight(), this); // see javadoc for more info on the parameters            
+				     g.drawImage(img, 0, 0, img.getWidth(), img.getHeight(), this);           
 				 }
 			};
 			window.setContentPane(panel);
-			window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			window.setSize(img.getWidth(), img.getHeight());
 			window.setResizable(false);
 			window.setVisible(true);
@@ -379,7 +380,7 @@ public class Client {
 						i = bufferedReader.readLine();
 						System.out.println(" to:");
 						j = bufferedReader.readLine();
-						client.manageGetInterval(i, j);
+						client.manageGetInterval((new MyTime(i)).getTime(), (new MyTime(j)).getTime());
 					} else if(getType.equalsIgnoreCase("image")) {
 						String messageId;
 						System.out.println(" Get image of message with id:");
@@ -393,6 +394,8 @@ public class Client {
 					System.out.println("Invalid command.");
 				}
 			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
 			

@@ -46,5 +46,8 @@ public final class Constants {
 	public static final String TOPIC_SUBSCRIPTION_IMAGES_PREFIX = "SUBSCRIPTION_IMAGES_USERS_";
 	
 	public static final String PROPERTY_USER_ID = "USER_ID";
+	public static final String PROPERTY_MESSAGE_ID = "IMAGE_MESSAGE_ID";
 	public static final String PROPERTY_IMAGE_MESSAGE_ID = "IMAGE_MESSAGE_ID";
+	
+	public static final String JMS_PROPERTY_MESSAGE_ID_PREFIX = "MSG_ID_";
 }
