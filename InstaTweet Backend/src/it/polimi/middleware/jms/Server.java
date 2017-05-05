@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.jms.ConnectionFactory;
+import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
 import javax.jms.Message;
@@ -28,8 +29,10 @@ public class Server {
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue requestsQueue;
+	private JMSConsumer jmsConsumer;
 	private QueueBrowser browser;
 	private ArrayList<ServerInstance> serverInstances;
+	private long nextCheckTime;
 	
 	private Server() {
 		currentNumberOfServerInstances = 0;
@@ -43,7 +46,12 @@ public class Server {
 	
 	private void startServer() throws NamingException {
 		createContexts();
-		requestsQueue = (Queue) initialContext.lookup(Constants.QUEUE_REQUESTS_NAME);
+		try {
+			requestsQueue = (Queue) initialContext.lookup(Constants.QUEUE_REQUESTS_NAME);
+		} catch(NamingException e) {
+			requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
+		}
+		jmsConsumer = jmsContext.createConsumer(requestsQueue);
 		browser = jmsContext.createBrowser(requestsQueue);
 		System.out.println("SRV: server started.");
 		startNewServerInstance();
@@ -66,13 +74,21 @@ public class Server {
 	}
 	
 	private void loop() {
+		Message msg;
+		nextCheckTime = System.currentTimeMillis() + Constants.SERVER_CHECK_LOAD_TIME_INTERVAL;
 		while(true) {
-			if(getNumberOfMessages() > Constants.SERVER_MAX_LOAD_THRESOLD)
-				startNewServerInstance();
-			try {
-				Thread.sleep(Constants.SERVER_CHECK_LOAD_TIME_INTERVAL);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			if(System.currentTimeMillis() > nextCheckTime) {
+				int n = getNumberOfMessages();
+				if(n > Constants.SERVER_MAX_LOAD_THRESOLD) {
+					System.out.println("SRV: requests number = " + n);
+					startNewServerInstance();
+				} else
+					System.out.println("SRV: requests number = " + n + " (Thresold " + Constants.SERVER_MAX_LOAD_THRESOLD + ")");
+				nextCheckTime = System.currentTimeMillis() + Constants.SERVER_CHECK_LOAD_TIME_INTERVAL;
+			} else {
+				msg = jmsConsumer.receiveNoWait();
+				if(msg != null)
+					onMessage(msg);
 			}
 		}
 	}
@@ -91,6 +107,28 @@ public class Server {
 			e.printStackTrace();
 		}
 		return n;
+	}
+
+	public void onMessage(Message msg) {
+		boolean messageProcessed = false;
+		while(!messageProcessed) {
+			for(ServerInstance si : serverInstances) {
+				if(si.getWait()) {
+					synchronized(si) {
+						si.setRequest(msg);
+						si.setNoWait();
+						si.notify();
+					}
+					messageProcessed = true;
+				}
+			}
+			/*
+			try {
+				Thread.sleep(Constants.SERVER_CHECK_LOAD_TIME_INTERVAL);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}*/
+		}
 	}
 
 	public static void main(String[] args) {

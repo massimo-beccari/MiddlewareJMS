@@ -8,6 +8,7 @@ public class User {
 	private String password;
 	private ArrayList<Integer> followedUsers;
 	private long lastMessageReadTimestamp;
+	private boolean isLogged;
 	
 	public User(int userId, String username, String password) {
 		this.userId = userId;
@@ -15,6 +16,7 @@ public class User {
 		this.password = password;
 		followedUsers = new ArrayList<Integer>();
 		lastMessageReadTimestamp = 0;
+		isLogged = true;
 	}
 
 	public String getPassword() {
@@ -49,5 +51,13 @@ public class User {
 	
 	public synchronized void setLastMessageReadTimestamp(long lastMessageReadTimestamp) {
 		this.lastMessageReadTimestamp = lastMessageReadTimestamp;
+	}
+
+	public synchronized boolean isLogged() {
+		return isLogged;
+	}
+
+	public synchronized void setLogged(boolean isLogged) {
+		this.isLogged = isLogged;
 	}
 }

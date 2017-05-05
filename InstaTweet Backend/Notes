@@ -3,6 +3,6 @@ registration: username password -> RESPONSE: OK userId | Error error_code
 login: username password -> RESPONSE: OK userId | Error error_code
 follow: followedUsername -> RESPONSE: OK null | Error error_code
 post: text image_file_path
-get: all_new -> RESPONSE: OK null | OK no_new_messages | Error error_code
+get: all_new -> RESPONSE: OK null | Warning no_new_messages | Error error_code
 get: from_i_to_j i j -> RESPONSE: OK null | Error error_code
 get: image imageMessageId -> RESPONSE: OK null | Error error_code

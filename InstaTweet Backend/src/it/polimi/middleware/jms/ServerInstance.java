@@ -5,7 +5,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 
 import javax.jms.ConnectionFactory;
-import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
 import javax.jms.JMSProducer;
@@ -19,6 +18,7 @@ import it.polimi.middleware.jms.model.IdDistributor;
 import it.polimi.middleware.jms.model.User;
 import it.polimi.middleware.jms.model.message.GeneralMessage;
 import it.polimi.middleware.jms.model.message.ImageMessage;
+import it.polimi.middleware.jms.model.message.MessageProperty;
 import it.polimi.middleware.jms.model.message.RequestMessage;
 import it.polimi.middleware.jms.model.message.ResponseMessage;
 
@@ -30,9 +30,9 @@ public class ServerInstance implements Runnable {
 	private HashMap<Integer, UserQueueDaemon> daemonsMap;
 	private Context initialContext;
 	private JMSContext jmsContext;
-	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
-	private Queue requestsQueue;
+	private boolean iWait;
+	private Message request;
 	
 	public ServerInstance(int SERVER_INSTANCE_NUMBER,
 			IdDistributor userIdDistributor, HashMap<Integer, User> usersMapId,
@@ -43,12 +43,11 @@ public class ServerInstance implements Runnable {
 		this.usersMapId = usersMapId;
 		this.usersMapUsername = usersMapUsername;
 		this.daemonsMap = daemonsMap;
+		iWait = true;
 	}
 	
 	public void startServer() throws NamingException {
 		createContexts();
-		requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
-		jmsConsumer = jmsContext.createConsumer(requestsQueue);
 		jmsProducer = jmsContext.createProducer();
 	}
 	
@@ -60,43 +59,57 @@ public class ServerInstance implements Runnable {
 
 	@Override
 	public void run() {
+		RequestMessage msg = null;
+		Queue responseQueue = null;
 		while(true) {
-			Message message = jmsConsumer.receive();
-			onMessage(message);
+			//i wait a request and then fetch the request data
+			synchronized(this) {
+				try {
+					while(iWait) {
+						wait();
+					}
+					try {
+						msg = request.getBody(RequestMessage.class);
+						responseQueue = (Queue) request.getJMSReplyTo();
+					} catch (JMSException e) {
+						e.printStackTrace();
+					}
+				} catch(InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			//i process the message
+			onMessage(msg, responseQueue);
+			iWait = true;
 		}
 	}
 
-	public void onMessage(Message message) {
-		try {
-			RequestMessage request = message.getBody(RequestMessage.class);
-			Queue responseQueue = (Queue) message.getJMSReplyTo();
-			switch(request.getRequestCode()) {
-			case Constants.REQUEST_REGISTER:
-				manageRegistration(request, responseQueue);
-				break;
-				
-			case Constants.REQUEST_LOGIN:
-				manageLogin(request, responseQueue);
-				break;
-				
-			case Constants.REQUEST_UNREGISTER:
-				
-				break;
-				
-			case Constants.REQUEST_LOGOUT:
-				
-				break;
-				
-			case Constants.REQUEST_FOLLOW:
-				manageFollow(request, responseQueue);
-				break;
-				
-			case Constants.REQUEST_GET:
-				manageGet(request, responseQueue);
-				break;
-			}
-		} catch (JMSException e) {
-			e.printStackTrace();
+	public void onMessage(RequestMessage request, Queue responseQueue) {
+		switch(request.getRequestCode()) {
+		
+		case Constants.REQUEST_REGISTER:
+			manageRegistration(request, responseQueue);
+			break;
+			
+		case Constants.REQUEST_LOGIN:
+			manageLogin(request, responseQueue);
+			break;
+			
+		case Constants.REQUEST_UNREGISTER:
+			
+			break;
+			
+		case Constants.REQUEST_LOGOUT:
+			
+			break;
+			
+		case Constants.REQUEST_FOLLOW:
+			manageFollow(request, responseQueue);
+			break;
+			
+		case Constants.REQUEST_GET:
+			manageGet(request, responseQueue);
+			break;
 		}
 	}
 
@@ -112,9 +125,7 @@ public class ServerInstance implements Runnable {
 				userArleadyExists = usersMapUsername.containsKey(username);
 			}
 			if(!userArleadyExists) {
-				synchronized(userIdDistributor) {
-					userId = userIdDistributor.getNewId();
-				}
+				userId = userIdDistributor.getNewId();
 				User newUser = new User(userId, username, password);
 				synchronized(usersMapId) {
 					usersMapId.put(userId, newUser);
@@ -219,6 +230,7 @@ public class ServerInstance implements Runnable {
 		if(params != null && params.size() > 0) {
 			int getCode = Integer.parseInt(params.get(0));
 			switch(getCode) {
+			
 			case Constants.REQUEST_GET_ALL_NEW:
 				manageGetAllNew(request.getUserId(), responseQueue);
 				break;
@@ -263,6 +275,8 @@ public class ServerInstance implements Runnable {
 				Message msg = messages.nextElement();
 				GeneralMessage message = msg.getBody(GeneralMessage.class);
 				if(msg.getJMSTimestamp() > lastMessageReadTimestamp) {
+					ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
+					messageProperties.add(new MessageProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID, msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID)));
 					Utils.sendMessage(jmsContext, message, jmsProducer, destinationQueue, null, null);
 					newTimestamp = msg.getJMSTimestamp();
 				}
@@ -295,6 +309,8 @@ public class ServerInstance implements Runnable {
 					Message msg = messages.nextElement();
 					GeneralMessage message = msg.getBody(GeneralMessage.class);
 					if(msg.getJMSTimestamp() >= i && msg.getJMSTimestamp() <= j) {
+						ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
+						messageProperties.add(new MessageProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID, msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID)));
 						Utils.sendMessage(jmsContext, message, jmsProducer, destinationQueue, null, null);
 						iSentSomething = true;
 					}
@@ -319,8 +335,12 @@ public class ServerInstance implements Runnable {
 			userImagesQueue = (Queue) initialContext.lookup(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
 			destinationQueue = (Queue) initialContext.lookup(Constants.QUEUE_GET_USER_PREFIX + userId);
 			String selector = "JMSMessageID IS NOT NULL AND JMSMessageID = " + imageMessageId;
-			JMSConsumer consumer = jmsContext.createConsumer(userImagesQueue, selector);
-			Message msg = consumer.receive();
+			QueueBrowser browser = jmsContext.createBrowser(userImagesQueue, selector);
+			@SuppressWarnings("unchecked")
+			Enumeration<Message> messages = browser.getEnumeration();
+			Message msg = null;
+			if(messages.hasMoreElements())
+				msg = messages.nextElement();
 			ImageMessage message = msg.getBody(ImageMessage.class);
 			Utils.sendMessage(jmsContext, message, jmsProducer, destinationQueue, null, null);
 			sendOkResponse(responseQueue, null);
@@ -339,5 +359,17 @@ public class ServerInstance implements Runnable {
 	private void sendBadParamsResponse(Queue responseQueue) {
 		ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_BAD_PARAMS);
 		jmsProducer.send(responseQueue, response);
+	}
+	
+	public void setNoWait() {
+		iWait = false;
+	}
+	
+	public void setRequest(Message request) {
+		this.request = request;
+	}
+	
+	public boolean getWait() {
+		return iWait;
 	}
 }

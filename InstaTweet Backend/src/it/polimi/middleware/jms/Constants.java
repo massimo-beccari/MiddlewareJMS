@@ -23,6 +23,7 @@ public final class Constants {
 	
 	public static final int RESPONSE_ERROR = 0;
 	public static final int RESPONSE_OK = 1;
+	public static final int RESPONSE_WARNING = 2;
 	
 	public static final String RESPONSE_INFO_BAD_PARAMS = "BAD_PARAMS";
 	public static final String RESPONSE_INFO_USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS";
@@ -40,6 +41,7 @@ public final class Constants {
 	public static final String QUEUE_GET_USER_PREFIX = "QUEUE_USER_";
 	public static final String TOPIC_USER_MESSAGES_PREFIX = "TOPIC_MESSAGES_USER_";
 	public static final String TOPIC_USER_IMAGES_PREFIX = "TOPIC_IMAGES_USER_";
+	public static final String TOPIC_SUBSCRIPTION_REQUESTS_PREFIX = "SUBSCRIPTION_REQUEST_SERVER_INSTANCE_";
 	public static final String TOPIC_SUBSCRIPTION_MESSAGES_PREFIX = "SUBSCRIPTION_MESSAGES_USERS_";
 	public static final String TOPIC_SUBSCRIPTION_IMAGES_PREFIX = "SUBSCRIPTION_IMAGES_USERS_";
 	
