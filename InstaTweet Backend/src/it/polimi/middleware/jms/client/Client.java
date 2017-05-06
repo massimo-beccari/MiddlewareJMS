@@ -8,17 +8,13 @@ import it.polimi.middleware.jms.server.model.message.ImageMessage;
 import it.polimi.middleware.jms.server.model.message.RequestMessage;
 import it.polimi.middleware.jms.server.model.message.ResponseMessage;
 
-import java.awt.Graphics;
-import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
-import javax.imageio.ImageIO;
 import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
@@ -28,8 +24,6 @@ import javax.jms.Message;
 import javax.jms.Queue;
 import javax.naming.Context;
 import javax.naming.NamingException;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
 
 public class Client {
 	private Context initialContext;
@@ -190,6 +184,7 @@ public class Client {
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
 					System.out.println("Response: OK. Getting new messages...");
 					getMessagesFromQueue(1);
+					System.out.println("Messages opened in new windows.");
 				} else if(response.getResponseCode() == Constants.RESPONSE_WARNING)
 					System.out.println("Response: WARNING: " + response.getResponseInfo());
 				else
@@ -215,6 +210,7 @@ public class Client {
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
 					System.out.println("Response: OK. Getting messages...");
 					getMessagesFromQueue(1);
+					System.out.println("Messages opened in new windows.");
 				} else if(response.getResponseCode() == Constants.RESPONSE_WARNING)
 					System.out.println("Response: WARNING: " + response.getResponseInfo());
 				else
@@ -239,6 +235,7 @@ public class Client {
 				if(response.getResponseCode() == Constants.RESPONSE_OK) {
 					System.out.println("Response: OK. Getting image...");
 					getMessagesFromQueue(2);
+					System.out.println("Image opened in a new window.");
 				} else
 					System.out.println("Response: ERROR: " + response.getResponseInfo());
 			} catch (JMSException e) {
@@ -256,20 +253,27 @@ public class Client {
 			while(msg != null) {
 				try {
 					message = msg.getBody(GeneralMessage.class);
+					MessageViewer messageViewer;
 					switch(message.getType()) {
 					case Constants.MESSAGE_ONLY_TEXT:
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID), message.getText());
+						messageViewer = new MessageViewer(Constants.MESSAGE_ONLY_TEXT, 
+								msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID),
+								message.getText(), null);
+						messageViewer.show();
 						break;
 						
 					case Constants.MESSAGE_ONLY_IMAGE:
-						displayImageMessage(message.getImage(), message.getImageExtension());
+						messageViewer = new MessageViewer(Constants.MESSAGE_ONLY_IMAGE, 
+								msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID),
+								null, message.getImage());
+						messageViewer.show();
 						break;
 						
 					case Constants.MESSAGE_TEXT_AND_IMAGE:
-						//TODO
-						System.out.println("IMG_ID: "+msg.getStringProperty(Constants.PROPERTY_NAME_IMAGE_MESSAGE_ID));
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID), message.getText());
-						displayImageMessage(message.getImage(), message.getImageExtension());
+						messageViewer = new MessageViewer(Constants.MESSAGE_TEXT_AND_IMAGE, 
+								msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID),
+								message.getText(), message.getImage());
+						messageViewer.show();
 						break;
 					}
 				} catch (JMSException e) {
@@ -283,38 +287,13 @@ public class Client {
 			Message msg = messageConsumer.receive();
 			try {
 				message = msg.getBody(ImageMessage.class);
-				displayImageMessage(message.getImage(), message.getExtension());
+				MessageViewer messageViewer = new MessageViewer(Constants.MESSAGE_ONLY_IMAGE, 
+						msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID),
+						null, message.getImage());
+				messageViewer.show();
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		}
-	}
-
-	private void displayTextMessage(String messageId, String message) {
-		System.out.println("MSG_ID: " + messageId);
-		System.out.println("MESSAGE: " + message);
-		System.out.println("");
-	}
-
-	private void displayImageMessage(byte[] image, String extension) {
-		try {
-			BufferedImage img = ImageIO.read(new ByteArrayInputStream(image));
-			JFrame window = new JFrame();
-			@SuppressWarnings("serial")
-			JPanel panel = new JPanel() {
-				 @Override
-				 protected void paintComponent(Graphics g) {
-					 super.paintComponent(g);
-				     g.drawImage(img, 0, 0, img.getWidth(), img.getHeight(), this);           
-				 }
-			};
-			window.setContentPane(panel);
-			window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-			window.setSize(img.getWidth(), img.getHeight());
-			window.setResizable(false);
-			window.setVisible(true);
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 
