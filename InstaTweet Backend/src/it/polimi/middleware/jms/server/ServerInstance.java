@@ -1,26 +1,25 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.server;
 
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 
-import javax.jms.ConnectionFactory;
+import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
 import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Queue;
 import javax.jms.QueueBrowser;
-import javax.naming.Context;
 import javax.naming.NamingException;
 
-import it.polimi.middleware.jms.model.IdDistributor;
-import it.polimi.middleware.jms.model.User;
-import it.polimi.middleware.jms.model.message.GeneralMessage;
-import it.polimi.middleware.jms.model.message.ImageMessage;
-import it.polimi.middleware.jms.model.message.MessageProperty;
-import it.polimi.middleware.jms.model.message.RequestMessage;
-import it.polimi.middleware.jms.model.message.ResponseMessage;
+import it.polimi.middleware.jms.server.model.IdDistributor;
+import it.polimi.middleware.jms.server.model.User;
+import it.polimi.middleware.jms.server.model.message.GeneralMessage;
+import it.polimi.middleware.jms.server.model.message.ImageMessage;
+import it.polimi.middleware.jms.server.model.message.MessageProperty;
+import it.polimi.middleware.jms.server.model.message.RequestMessage;
+import it.polimi.middleware.jms.server.model.message.ResponseMessage;
 
 public class ServerInstance implements Runnable {
 	private int SERVER_INSTANCE_NUMBER;
@@ -29,104 +28,85 @@ public class ServerInstance implements Runnable {
 	private HashMap<Integer, User> usersMapId;
 	private HashMap<String, User> usersMapUsername;
 	private HashMap<Integer, UserQueueDaemon> daemonsMap;
-	private Context initialContext;
 	private JMSContext jmsContext;
+	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
-	private boolean iWait;
-	private Message request;
+	private Queue requestsQueue;
 	
-	public ServerInstance(int SERVER_INSTANCE_NUMBER,
+	public ServerInstance(int SERVER_INSTANCE_NUMBER, JMSContext jmsContext,
 			IdDistributor userIdDistributor, IdDistributor messageIdDistributor, HashMap<Integer, User> usersMapId,
 			HashMap<String, User> usersMapUsername,
 			HashMap<Integer, UserQueueDaemon> daemonsMap) {
 		this.SERVER_INSTANCE_NUMBER = SERVER_INSTANCE_NUMBER;
+		this.jmsContext = jmsContext;
 		this.userIdDistributor = userIdDistributor;
 		this.messageIdDistributor = messageIdDistributor;
 		this.usersMapId = usersMapId;
 		this.usersMapUsername = usersMapUsername;
 		this.daemonsMap = daemonsMap;
-		iWait = true;
 	}
 	
-	public void startServer() throws NamingException {
-		createContexts();
+	private void startServer() throws NamingException {
+		requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
+		jmsConsumer = jmsContext.createConsumer(requestsQueue);
 		jmsProducer = jmsContext.createProducer();
-	}
-	
-	private void createContexts() throws NamingException {
-		initialContext = Utils.getContext();
-		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
-		jmsContext.setClientID("SERVER_INSTANCE_" + SERVER_INSTANCE_NUMBER);
 	}
 
 	@Override
 	public void run() {
-		RequestMessage msg = null;
-		Queue responseQueue = null;
 		try {
 			startServer();
 			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": server instance started.");
 			while(true) {
-				//i wait a request and then fetch the request data
-				synchronized(this) {
-					try {
-						while(iWait) {
-							wait();
-						}
-						try {
-							msg = request.getBody(RequestMessage.class);
-							responseQueue = (Queue) request.getJMSReplyTo();
-						} catch (JMSException e) {
-							e.printStackTrace();
-						}
-					} catch(InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-				//i process the message
-				onMessage(msg, responseQueue);
-				iWait = true;
+				Message msg = jmsConsumer.receive();
+				onMessage(msg);
 			}
 		} catch (NamingException e1) {
 			e1.printStackTrace();
 		}
 	}
 
-	public void onMessage(RequestMessage request, Queue responseQueue) {
-		System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": requests received.");
-		switch(request.getRequestCode()) {
-		
-		case Constants.REQUEST_REGISTER:
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing registration...");
-			manageRegistration(request, responseQueue);
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": registration processed.");
-			break;
+	public void onMessage(Message msg) {
+		try {
+			RequestMessage request = msg.getBody(RequestMessage.class);
+			Queue responseQueue = (Queue) msg.getJMSReplyTo();
+			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": requests received.");
+			switch(request.getRequestCode()) {
 			
-		case Constants.REQUEST_LOGIN:
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing login...");
-			manageLogin(request, responseQueue);
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": login processed.");
-			break;
-			
-		case Constants.REQUEST_UNREGISTER:
-			
-			break;
-			
-		case Constants.REQUEST_LOGOUT:
-			
-			break;
-			
-		case Constants.REQUEST_FOLLOW:
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing follow...");
-			manageFollow(request, responseQueue);
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": follow processed.");
-			break;
-			
-		case Constants.REQUEST_GET:
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing get...");
-			manageGet(request, responseQueue);
-			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": get processed.");
-			break;
+			case Constants.REQUEST_REGISTER:
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing registration...");
+				manageRegistration(request, responseQueue);
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": registration processed.");
+				break;
+				
+			case Constants.REQUEST_LOGIN:
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing login...");
+				manageLogin(request, responseQueue);
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": login processed.");
+				break;
+				
+			case Constants.REQUEST_UNREGISTER:
+				
+				break;
+				
+			case Constants.REQUEST_LOGOUT:
+				
+				break;
+				
+			case Constants.REQUEST_FOLLOW:
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing follow...");
+				manageFollow(request, responseQueue);
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": follow processed.");
+				break;
+				
+			case Constants.REQUEST_GET:
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing get...");
+				manageGet(request, responseQueue);
+				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": get processed.");
+				break;
+			}
+		} catch (JMSException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -191,13 +171,13 @@ public class ServerInstance implements Runnable {
 	}
 	
 	private void runHandler(int userId) {
-		UserHandler handler = new UserHandler(userId, messageIdDistributor);
+		UserHandler handler = new UserHandler(jmsContext, userId, messageIdDistributor);
 		Thread t = new Thread(handler);
 		t.start();
 	}
 	
 	private void runDaemon(int userId) {
-		UserQueueDaemon daemon = new UserQueueDaemon(userId, messageIdDistributor);
+		UserQueueDaemon daemon = new UserQueueDaemon(jmsContext, userId, messageIdDistributor);
 		synchronized(daemonsMap) {
 			daemonsMap.put(userId, daemon);
 		}
@@ -276,7 +256,7 @@ public class ServerInstance implements Runnable {
 				
 			case Constants.REQUEST_GET_IMAGE:
 				if(params.size() == 2) {
-					int imageMessageId = Integer.parseInt(params.get(1));
+					String imageMessageId = params.get(1);
 					manageGetImage(request.getUserId(), responseQueue, imageMessageId);
 				} else
 					sendBadParamsResponse(responseQueue);
@@ -339,7 +319,7 @@ public class ServerInstance implements Runnable {
 				QueueBrowser browser = jmsContext.createBrowser(userMessagesQueue);
 				@SuppressWarnings("unchecked")
 				Enumeration<Message> messages = browser.getEnumeration();
-				//send new messages
+				//send messages
 				while(messages.hasMoreElements()) {
 					Message msg = messages.nextElement();
 					GeneralMessage message = msg.getBody(GeneralMessage.class);
@@ -370,21 +350,31 @@ public class ServerInstance implements Runnable {
 			sendBadParamsResponse(responseQueue);
 	}
 	
-	private void manageGetImage(int userId, Queue responseQueue, int imageMessageId) {
+	private void manageGetImage(int userId, Queue responseQueue, String imageMessageId) {
 		Queue userImagesQueue, destinationQueue;
 		try {
 			userImagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
 			destinationQueue = jmsContext.createQueue(Constants.QUEUE_GET_USER_PREFIX + userId);
-			String selector = Constants.PROPERTY_IMAGE_MESSAGE_ID + " IS NOT NULL AND " + Constants.PROPERTY_IMAGE_MESSAGE_ID + " = " + imageMessageId;
+			String selector = Constants.PROPERTY_NAME_MESSAGE_ID + " IS NOT NULL AND " + Constants.PROPERTY_NAME_MESSAGE_ID + " = \'" + imageMessageId + "\'";
 			QueueBrowser browser = jmsContext.createBrowser(userImagesQueue, selector);
 			@SuppressWarnings("unchecked")
 			Enumeration<Message> messages = browser.getEnumeration();
 			Message msg = null;
-			if(messages.hasMoreElements())
+			if(messages.hasMoreElements()) {
 				msg = messages.nextElement();
-			ImageMessage message = msg.getBody(ImageMessage.class);
-			Utils.sendMessage(null, jmsContext, message, jmsProducer, destinationQueue, null, null);
-			sendOkResponse(responseQueue, null);
+				ImageMessage message = msg.getBody(ImageMessage.class);
+				//set properties
+				ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
+				@SuppressWarnings("unchecked")
+				Enumeration<String> propertyNames = msg.getPropertyNames();
+				while(propertyNames.hasMoreElements()) {
+					String propertyName = propertyNames.nextElement();
+					messageProperties.add(new MessageProperty(propertyName, msg.getStringProperty(propertyName)));
+				}
+				Utils.sendMessage(null, jmsContext, message, jmsProducer, destinationQueue, messageProperties, null);
+				sendOkResponse(responseQueue, null);
+			} else
+				sendBadParamsResponse(responseQueue);
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
@@ -406,18 +396,6 @@ public class ServerInstance implements Runnable {
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
-	}
-	
-	public void setNoWait() {
-		iWait = false;
-	}
-	
-	public void setRequest(Message request) {
-		this.request = request;
-	}
-	
-	public boolean getWait() {
-		return iWait;
 	}
 
 	public int getSERVER_INSTANCE_NUMBER() {

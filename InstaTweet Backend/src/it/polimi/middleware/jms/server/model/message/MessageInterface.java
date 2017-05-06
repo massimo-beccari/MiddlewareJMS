@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model.message;
+package it.polimi.middleware.jms.server.model.message;
 
 import java.io.Serializable;
 

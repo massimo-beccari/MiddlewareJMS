@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model;
+package it.polimi.middleware.jms.server.model;
 
 public class IdDistributor {
 	private int nextId;

@@ -1,8 +1,8 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.server;
 
-import it.polimi.middleware.jms.model.IdDistributor;
-import it.polimi.middleware.jms.model.message.MessageInterface;
-import it.polimi.middleware.jms.model.message.MessageProperty;
+import it.polimi.middleware.jms.server.model.IdDistributor;
+import it.polimi.middleware.jms.server.model.message.MessageInterface;
+import it.polimi.middleware.jms.server.model.message.MessageProperty;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,18 +38,29 @@ public class Utils {
 		String messageId = null;
 		if(messageIdDistributor != null) {
 			int mId = messageIdDistributor.getNewId();
-			messageId = Constants.JMS_PROPERTY_MESSAGE_ID_PREFIX + mId;
+			messageId = Constants.PROPERTY_VALUE_MESSAGE_ID_PREFIX + mId;
 			if(properties == null)
 				properties = new ArrayList<MessageProperty>();
-			properties.add(new MessageProperty(Constants.PROPERTY_MESSAGE_ID, messageId));
+			properties.add(new MessageProperty(Constants.PROPERTY_NAME_MESSAGE_ID, messageId));
 		}
 		if(properties != null) {
 			for(MessageProperty mp : properties)
 				objMessage.setStringProperty(mp.getPropertyName(), mp.getPropertyValue());
 		}
+		
+		//DEBUG
+		if(properties != null) {
+			System.out.print("MESSAGE PROPERTIES: ");
+			for(MessageProperty mp : properties)
+				System.out.print(mp.toString() + " ");
+			System.out.println("");
+		}
+		//END_DEBUG
+		
 		if(responseQueue != null)
 			objMessage.setJMSReplyTo(responseQueue);
 		jmsProducer.send(destination, objMessage);
+			
 		return messageId;
 	}
 	

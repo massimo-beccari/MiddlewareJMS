@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model.message;
+package it.polimi.middleware.jms.server.model.message;
 
 public class MessageProperty {
 	private String propertyName;
@@ -23,5 +23,10 @@ public class MessageProperty {
 
 	public void setPropertyValue(String propertyValue) {
 		this.propertyValue = propertyValue;
+	}
+	
+	@Override
+	public String toString() {
+		return "{\"" + propertyName  + "\", \"" + propertyValue + "\"}";
 	}
 }

@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model;
+package it.polimi.middleware.jms.server.model;
 
 import java.util.Calendar;
 import java.util.Scanner;

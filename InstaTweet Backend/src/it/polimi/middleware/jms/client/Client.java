@@ -1,10 +1,12 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.client;
 
-import it.polimi.middleware.jms.model.MyTime;
-import it.polimi.middleware.jms.model.message.GeneralMessage;
-import it.polimi.middleware.jms.model.message.ImageMessage;
-import it.polimi.middleware.jms.model.message.RequestMessage;
-import it.polimi.middleware.jms.model.message.ResponseMessage;
+import it.polimi.middleware.jms.server.Constants;
+import it.polimi.middleware.jms.server.Utils;
+import it.polimi.middleware.jms.server.model.MyTime;
+import it.polimi.middleware.jms.server.model.message.GeneralMessage;
+import it.polimi.middleware.jms.server.model.message.ImageMessage;
+import it.polimi.middleware.jms.server.model.message.RequestMessage;
+import it.polimi.middleware.jms.server.model.message.ResponseMessage;
 
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
@@ -34,6 +36,7 @@ public class Client {
 	private JMSContext jmsContext;
 	private JMSProducer jmsProducer;
 	private JMSConsumer responseConsumer;
+	private JMSConsumer messageConsumer;
 	private Queue requestsQueue;
 	private Queue responseQueue;
 	private Queue uploadQueue;
@@ -127,6 +130,7 @@ public class Client {
 	private void setupQueues() {
 		uploadQueue = jmsContext.createQueue(Constants.QUEUE_FROM_USER_PREFIX + userId);
 		messageQueue = jmsContext.createQueue(Constants.QUEUE_GET_USER_PREFIX + userId);
+		messageConsumer = jmsContext.createConsumer(messageQueue);
 	}
 	
 	private void follow(String followedUsername) {
@@ -245,7 +249,6 @@ public class Client {
 	}
 
 	private void getMessagesFromQueue(int type) {
-		JMSConsumer messageConsumer = jmsContext.createConsumer(messageQueue);
 		if(type == 1) {
 			//get general messages
 			GeneralMessage message;
@@ -255,7 +258,7 @@ public class Client {
 					message = msg.getBody(GeneralMessage.class);
 					switch(message.getType()) {
 					case Constants.MESSAGE_ONLY_TEXT:
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_MESSAGE_ID), message.getText());
+						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID), message.getText());
 						break;
 						
 					case Constants.MESSAGE_ONLY_IMAGE:
@@ -264,8 +267,8 @@ public class Client {
 						
 					case Constants.MESSAGE_TEXT_AND_IMAGE:
 						//TODO
-						System.out.println("IMG_ID "+msg.getStringProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID));
-						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_MESSAGE_ID), message.getText());
+						System.out.println("IMG_ID: "+msg.getStringProperty(Constants.PROPERTY_NAME_IMAGE_MESSAGE_ID));
+						displayTextMessage(msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID), message.getText());
 						displayImageMessage(message.getImage(), message.getImageExtension());
 						break;
 					}

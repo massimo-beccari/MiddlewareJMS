@@ -1,9 +1,8 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.server;
 
 import java.util.ArrayList;
 import java.util.Enumeration;
 
-import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
@@ -11,19 +10,17 @@ import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Queue;
 import javax.jms.Topic;
-import javax.naming.Context;
 import javax.naming.NamingException;
 
-import it.polimi.middleware.jms.model.IdDistributor;
-import it.polimi.middleware.jms.model.message.GeneralMessage;
-import it.polimi.middleware.jms.model.message.ImageMessage;
-import it.polimi.middleware.jms.model.message.MessageProperty;
+import it.polimi.middleware.jms.server.model.IdDistributor;
+import it.polimi.middleware.jms.server.model.message.GeneralMessage;
+import it.polimi.middleware.jms.server.model.message.ImageMessage;
+import it.polimi.middleware.jms.server.model.message.MessageProperty;
 
 public class UserQueueDaemon implements Runnable {
 	private int userId;
 	@SuppressWarnings("unused")
 	private IdDistributor messageIdDistributor;
-	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue userMessagesQueue;
 	private Queue userImagesQueue;
@@ -32,7 +29,8 @@ public class UserQueueDaemon implements Runnable {
 	private ArrayList<JMSConsumer> imageConsumers;
 	private boolean iWait;
 
-	public UserQueueDaemon(int userId, IdDistributor messageIdDistributor) {
+	public UserQueueDaemon(JMSContext jmsContext, int userId, IdDistributor messageIdDistributor) {
+		this.jmsContext = jmsContext;
 		this.userId = userId;
 		this.messageIdDistributor = messageIdDistributor;
 		messageConsumers = new ArrayList<JMSConsumer>();
@@ -41,20 +39,13 @@ public class UserQueueDaemon implements Runnable {
 	}
 	
 	/*
-	 * SETUP METHODS
+	 * SETUP METHOD
 	 */
 
 	private void setup() throws NamingException {
-		createContexts();
 		userMessagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_MESSAGES_PREFIX + userId);
 		userImagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
 		jmsProducer = jmsContext.createProducer();
-	}
-	
-	private void createContexts() throws NamingException {
-		initialContext = Utils.getContext();
-		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
-		jmsContext.setClientID("DAEMON_" + userId);
 	}
 	
 	/*
@@ -92,6 +83,8 @@ public class UserQueueDaemon implements Runnable {
 								System.out.println("QD" + userId + ": message forwarded.");
 							}
 						}
+						//sleep
+						Thread.sleep(100);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -131,7 +124,8 @@ public class UserQueueDaemon implements Runnable {
 				messageProperties.add(new MessageProperty(propertyName, message.getStringProperty(propertyName)));
 			}
 			//send message
-			ImageMessage msg = message.getBody(ImageMessage.class);//forward message to queue
+			ImageMessage msg = message.getBody(ImageMessage.class);
+			//forward message to queue
 			Utils.sendMessage(null, jmsContext, msg, jmsProducer, userImagesQueue, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();

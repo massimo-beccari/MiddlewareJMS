@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.server;
 
 public final class Constants {
 	public static final int SERVER_CHECK_LOAD_TIME_INTERVAL = 30000;
@@ -45,9 +45,8 @@ public final class Constants {
 	public static final String TOPIC_SUBSCRIPTION_MESSAGES_PREFIX = "SUBSCRIPTION_MESSAGES_USERS_";
 	public static final String TOPIC_SUBSCRIPTION_IMAGES_PREFIX = "SUBSCRIPTION_IMAGES_USERS_";
 	
-	public static final String PROPERTY_USER_ID = "USER_ID";
-	public static final String PROPERTY_MESSAGE_ID = "IMAGE_MESSAGE_ID";
-	public static final String PROPERTY_IMAGE_MESSAGE_ID = "IMAGE_MESSAGE_ID";
-	
-	public static final String JMS_PROPERTY_MESSAGE_ID_PREFIX = "MSG_ID_";
+	public static final String PROPERTY_NAME_USER_ID = "USER_ID";
+	public static final String PROPERTY_NAME_MESSAGE_ID = "MESSAGE_ID";
+	public static final String PROPERTY_NAME_IMAGE_MESSAGE_ID = "IMAGE_MESSAGE_ID";
+	public static final String PROPERTY_VALUE_MESSAGE_ID_PREFIX = "MSG_ID_";
 }

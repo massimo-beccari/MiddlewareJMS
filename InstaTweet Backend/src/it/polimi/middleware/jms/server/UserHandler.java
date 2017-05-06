@@ -1,13 +1,12 @@
-package it.polimi.middleware.jms;
+package it.polimi.middleware.jms.server;
 
 import java.util.ArrayList;
 
-import it.polimi.middleware.jms.model.IdDistributor;
-import it.polimi.middleware.jms.model.message.GeneralMessage;
-import it.polimi.middleware.jms.model.message.ImageMessage;
-import it.polimi.middleware.jms.model.message.MessageProperty;
+import it.polimi.middleware.jms.server.model.IdDistributor;
+import it.polimi.middleware.jms.server.model.message.GeneralMessage;
+import it.polimi.middleware.jms.server.model.message.ImageMessage;
+import it.polimi.middleware.jms.server.model.message.MessageProperty;
 
-import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
@@ -15,14 +14,12 @@ import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Queue;
 import javax.jms.Topic;
-import javax.naming.Context;
 import javax.naming.NamingException;
 
 public class UserHandler implements Runnable {
 	private boolean isConnected;
 	private int userId;
 	private IdDistributor messageIdDistributor;
-	private Context initialContext;
 	private JMSContext jmsContext;
 	private Queue queueFromUser;
 	private Topic userMessageTopic;
@@ -30,7 +27,8 @@ public class UserHandler implements Runnable {
 	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
 	
-	public UserHandler(int userId, IdDistributor messageIdDistributor) {
+	public UserHandler(JMSContext jmsContext, int userId, IdDistributor messageIdDistributor) {
+		this.jmsContext = jmsContext;
 		this.userId = userId;
 		this.messageIdDistributor = messageIdDistributor;
 		isConnected = true;
@@ -41,15 +39,8 @@ public class UserHandler implements Runnable {
 	 */
 
 	private void setup() throws NamingException {
-		createContexts();
 		createUserDestinations();
 		jmsProducer = jmsContext.createProducer();
-	}
-	
-	private void createContexts() throws NamingException {
-		initialContext = Utils.getContext();
-		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
-		jmsContext.setClientID("HANDLER_" + userId);
 	}
 	
 	private void createUserDestinations() {
@@ -91,7 +82,7 @@ public class UserHandler implements Runnable {
 
 	private void processTextMessage(GeneralMessage message) {
 		ArrayList<MessageProperty> properties = new ArrayList<MessageProperty>();
-		properties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
+		properties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
 		try {
 			Utils.sendMessage(messageIdDistributor, jmsContext, message, jmsProducer, userMessageTopic, properties, null);
 		} catch (JMSException e) {
@@ -105,13 +96,13 @@ public class UserHandler implements Runnable {
 		ImageMessage imageMessage = new ImageMessage(userId, message.getImageExtension(), message.getImage());
 		//create properties for messages
 		ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
-		messageProperties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
+		messageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
 		ArrayList<MessageProperty> imageProperties = new ArrayList<MessageProperty>();
-		imageProperties.add(new MessageProperty(Constants.PROPERTY_USER_ID, "" + userId));
+		imageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
 		//send messages
 		try {
 			String imageMessageId = Utils.sendMessage(messageIdDistributor, jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties, null);
-			messageProperties.add(new MessageProperty(Constants.PROPERTY_IMAGE_MESSAGE_ID, imageMessageId));
+			messageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_IMAGE_MESSAGE_ID, imageMessageId));
 			Utils.sendMessage(messageIdDistributor, jmsContext, messageWithThumbnail, jmsProducer, userMessageTopic, messageProperties, null);
 		} catch (JMSException e) {
 			e.printStackTrace();

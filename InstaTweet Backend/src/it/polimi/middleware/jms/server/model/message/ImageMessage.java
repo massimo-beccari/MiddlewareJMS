@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.model.message;
+package it.polimi.middleware.jms.server.model.message;
 
 public class ImageMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;
