@@ -1,6 +1,6 @@
 package it.polimi.middleware.jms.server.model.message;
 
-import it.polimi.middleware.jms.server.Constants;
+import it.polimi.middleware.jms.Constants;
 
 public class GeneralMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;

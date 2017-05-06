@@ -1,7 +1,7 @@
 package it.polimi.middleware.jms.client;
 
-import it.polimi.middleware.jms.server.Constants;
-import it.polimi.middleware.jms.server.Utils;
+import it.polimi.middleware.jms.Constants;
+import it.polimi.middleware.jms.Utils;
 import it.polimi.middleware.jms.server.model.MyTime;
 import it.polimi.middleware.jms.server.model.message.GeneralMessage;
 import it.polimi.middleware.jms.server.model.message.ImageMessage;

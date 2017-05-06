@@ -12,6 +12,8 @@ import javax.jms.Queue;
 import javax.jms.Topic;
 import javax.naming.NamingException;
 
+import it.polimi.middleware.jms.Constants;
+import it.polimi.middleware.jms.Utils;
 import it.polimi.middleware.jms.server.model.IdDistributor;
 import it.polimi.middleware.jms.server.model.message.GeneralMessage;
 import it.polimi.middleware.jms.server.model.message.ImageMessage;

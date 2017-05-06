@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.server;
+package it.polimi.middleware.jms;
 
 public final class Constants {
 	public static final int SERVER_CHECK_LOAD_TIME_INTERVAL = 30000;

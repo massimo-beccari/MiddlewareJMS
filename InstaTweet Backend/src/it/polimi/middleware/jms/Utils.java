@@ -1,4 +1,4 @@
-package it.polimi.middleware.jms.server;
+package it.polimi.middleware.jms;
 
 import it.polimi.middleware.jms.server.model.IdDistributor;
 import it.polimi.middleware.jms.server.model.message.MessageInterface;

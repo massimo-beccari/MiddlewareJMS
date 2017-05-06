@@ -13,6 +13,8 @@ import javax.jms.Queue;
 import javax.jms.QueueBrowser;
 import javax.naming.NamingException;
 
+import it.polimi.middleware.jms.Constants;
+import it.polimi.middleware.jms.Utils;
 import it.polimi.middleware.jms.server.model.IdDistributor;
 import it.polimi.middleware.jms.server.model.User;
 import it.polimi.middleware.jms.server.model.message.GeneralMessage;
