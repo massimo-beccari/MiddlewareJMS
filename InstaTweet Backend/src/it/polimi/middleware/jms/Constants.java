@@ -4,6 +4,8 @@ public final class Constants {
 	public static final int SERVER_CHECK_LOAD_TIME_INTERVAL = 30000;
 	public static final int SERVER_MAX_LOAD_THRESOLD = 10;
 	
+	public static final int THUMBNAIL_MAX_DIMENSION = 64;
+	
 	public static final int UNREGISTERED_USER_ID = -1;
 	
 	public static final int MESSAGE_ONLY_TEXT = 1;

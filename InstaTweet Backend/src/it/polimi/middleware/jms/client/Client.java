@@ -2,7 +2,6 @@ package it.polimi.middleware.jms.client;
 
 import it.polimi.middleware.jms.Constants;
 import it.polimi.middleware.jms.Utils;
-import it.polimi.middleware.jms.server.model.MyTime;
 import it.polimi.middleware.jms.server.model.message.GeneralMessage;
 import it.polimi.middleware.jms.server.model.message.ImageMessage;
 import it.polimi.middleware.jms.server.model.message.RequestMessage;
@@ -362,7 +361,7 @@ public class Client {
 						i = bufferedReader.readLine();
 						System.out.println(" to:");
 						j = bufferedReader.readLine();
-						client.manageGetInterval((new MyTime(i)).getTime(), (new MyTime(j)).getTime());
+						client.manageGetInterval(Utils.getTimeFromDate(i), Utils.getTimeFromDate(j));
 					} else if(getType.equalsIgnoreCase("image")) {
 						String messageId;
 						System.out.println(" Get image of message with id:");
