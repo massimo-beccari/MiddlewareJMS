@@ -5,13 +5,15 @@ import it.polimi.middleware.jms.Constants;
 public class GeneralMessage implements MessageInterface {
 	private static final long serialVersionUID = 1L;
 	private int userId;
+	private String username;
 	private String text;
 	private String imageExtension;
 	private byte[] image;
 	private int type;
 	
-	public GeneralMessage(int userId, String text, String imageExtension, byte[] image) {
+	public GeneralMessage(int userId, String username, String text, String imageExtension, byte[] image) {
 		this.userId = userId;
+		this.username = username;
 		this.text = text;
 		this.imageExtension = imageExtension;
 		this.image = image;
@@ -25,6 +27,10 @@ public class GeneralMessage implements MessageInterface {
 
 	public int getUserId() {
 		return userId;
+	}
+
+	public String getUsername() {
+		return username;
 	}
 
 	public String getText() {

@@ -67,10 +67,10 @@ public class UserHandler implements Runnable {
 				try {
 					GeneralMessage message = msg.getBody(GeneralMessage.class);
 					if(message.getType() == Constants.MESSAGE_ONLY_TEXT) {
-						processTextMessage(message);
+						processTextMessage(message, msg.getJMSTimestamp());
 						System.out.println("UH" + userId + ": text message processed.");
 					} else {
-						processMessageWithImage(message);
+						processMessageWithImage(message, msg.getJMSTimestamp());
 						System.out.println("UH" + userId + ": text/image message processed.");
 					}
 				} catch (JMSException e) {
@@ -82,9 +82,10 @@ public class UserHandler implements Runnable {
 		}
 	}
 
-	private void processTextMessage(GeneralMessage message) {
+	private void processTextMessage(GeneralMessage message, long timestamp) {
 		ArrayList<MessageProperty> properties = new ArrayList<MessageProperty>();
 		properties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
+		properties.add(new MessageProperty(Constants.PROPERTY_NAME_MESSAGE_TIMESTAMP, "" + timestamp));
 		try {
 			Utils.sendMessage(messageIdDistributor, jmsContext, message, jmsProducer, userMessageTopic, properties, null);
 		} catch (JMSException e) {
@@ -92,15 +93,17 @@ public class UserHandler implements Runnable {
 		}
 	}
 	
-	private void processMessageWithImage(GeneralMessage message) {
+	private void processMessageWithImage(GeneralMessage message, long timestamp) {
 		byte[] thumbnail = Utils.createImageThumbnail(message.getImage(), message.getImageExtension());
-		GeneralMessage messageWithThumbnail = new GeneralMessage(userId, message.getText(), message.getImageExtension(), thumbnail);
+		GeneralMessage messageWithThumbnail = new GeneralMessage(userId, message.getUsername(), message.getText(), message.getImageExtension(), thumbnail);
 		ImageMessage imageMessage = new ImageMessage(userId, message.getImageExtension(), message.getImage());
 		//create properties for messages
 		ArrayList<MessageProperty> messageProperties = new ArrayList<MessageProperty>();
 		messageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
+		messageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_MESSAGE_TIMESTAMP, "" + timestamp));
 		ArrayList<MessageProperty> imageProperties = new ArrayList<MessageProperty>();
 		imageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_USER_ID, "" + userId));
+		imageProperties.add(new MessageProperty(Constants.PROPERTY_NAME_MESSAGE_TIMESTAMP, "" + timestamp));
 		//send messages
 		try {
 			String imageMessageId = Utils.sendMessage(messageIdDistributor, jmsContext, imageMessage, jmsProducer, userImageTopic, imageProperties, null);

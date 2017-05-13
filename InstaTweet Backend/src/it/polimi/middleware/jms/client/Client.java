@@ -146,6 +146,26 @@ public class Client {
 			System.out.println("Error: you are not logged in. First login to the system.");
 	}
 	
+	private void unfollow(String followedUsername) {
+		if(logged) {
+			ArrayList<String> params = new ArrayList<String>();
+			params.add(followedUsername);
+			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_UNFOLLOW, params);
+			try {
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				Message msg = responseConsumer.receive();
+				ResponseMessage response = msg.getBody(ResponseMessage.class);
+				if(response.getResponseCode() == Constants.RESPONSE_OK) {
+					System.out.println("Response: OK.");
+				} else
+					System.out.println("Response: ERROR: " + response.getResponseInfo());
+			} catch (JMSException e) {
+				e.printStackTrace();
+			}
+		} else
+			System.out.println("Error: you are not logged in. First login to the system.");
+	}
+	
 	private void post(String text, String imageFilePath) {
 		if(logged) {
 			try {
@@ -158,7 +178,7 @@ public class Client {
 					imageFile.readFully(image);
 					imageFile.close();
 				}
-				GeneralMessage message = new GeneralMessage(userId, text, extension, image);
+				GeneralMessage message = new GeneralMessage(userId, username, text, extension, image);
 				Utils.sendMessage(null, jmsContext, message, jmsProducer, uploadQueue, null, null);
 			} catch (FileNotFoundException e) {
 				System.out.println("Error: file " + imageFilePath + " not found.");
@@ -248,11 +268,16 @@ public class Client {
 		if(type == 1) {
 			//get general messages
 			GeneralMessage message;
+			ArrayList<MessageHolder> messageList = new ArrayList<MessageHolder>();
 			Message msg = messageConsumer.receive();
 			while(msg != null) {
 				try {
 					message = msg.getBody(GeneralMessage.class);
-					MessageViewer messageViewer;
+					messageList.add(new MessageHolder(msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_ID),
+							msg.getStringProperty(Constants.PROPERTY_NAME_IMAGE_MESSAGE_ID),
+							message.getUsername(), message.getText(), message.getImage(), 
+							msg.getStringProperty(Constants.PROPERTY_NAME_MESSAGE_TIMESTAMP)));
+					/*MessageViewer messageViewer;
 					switch(message.getType()) {
 					case Constants.MESSAGE_ONLY_TEXT:
 						messageViewer = new MessageViewer(Constants.MESSAGE_ONLY_TEXT, 
@@ -274,11 +299,16 @@ public class Client {
 								message.getText(), message.getImage());
 						messageViewer.show();
 						break;
-					}
+					}*/
+					
 				} catch (JMSException e) {
 					e.printStackTrace();
 				}
 				msg = messageConsumer.receiveNoWait();
+			}
+			if(messageList.size() != 0) {
+				TimelineView timeline = new TimelineView(this, messageList);
+				timeline.showTimeline();
 			}
 		} else {
 			//get image message
@@ -313,31 +343,36 @@ public class Client {
 		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
 			try {
-				System.out.println("Commands:\nregister\nlogin\nfollow\npost\nget\nmy identity");
+				System.out.println("Commands:\nr register\nl login\nf follow\nuf unfollow\np post\ng get\nme my identity");
 				command = bufferedReader.readLine();
 				if(command.equalsIgnoreCase("exit")) {
 					client.close();
 					System.exit(0);
-				} else if(command.equalsIgnoreCase("register")) {
+				} else if(command.equalsIgnoreCase("r")) {
 					String username, password;
 					System.out.println(" Username:");
 					username = bufferedReader.readLine();
 					System.out.println(" Password:");
 					password = bufferedReader.readLine();
 					client.register(username, password);
-				} else if(command.equalsIgnoreCase("login")) {
+				} else if(command.equalsIgnoreCase("l")) {
 					String username, password;
 					System.out.println(" Username:");
 					username = bufferedReader.readLine();
 					System.out.println(" Password:");
 					password = bufferedReader.readLine();
 					client.login(username, password);
-				} else if(command.equalsIgnoreCase("follow")) {
+				} else if(command.equalsIgnoreCase("f")) {
 					String followedUsername;
 					System.out.println(" Followed user username:");
 					followedUsername = bufferedReader.readLine();
 					client.follow(followedUsername);
-				} else if(command.equalsIgnoreCase("post")) {
+				} else if(command.equalsIgnoreCase("uf")) {
+					String followedUsername;
+					System.out.println(" Followed user username:");
+					followedUsername = bufferedReader.readLine();
+					client.unfollow(followedUsername);
+				} else if(command.equalsIgnoreCase("p")) {
 					String text, imageFilePath;
 					System.out.println(" Text (or \"null\"):");
 					text = bufferedReader.readLine();
@@ -348,7 +383,7 @@ public class Client {
 					if(imageFilePath.equals("null"))
 						imageFilePath = null;
 					client.post(text, imageFilePath);
-				} else if(command.equalsIgnoreCase("get")) {
+				} else if(command.equalsIgnoreCase("g")) {
 					String getType;
 					System.out.println(" What to get:\n new - get new messages\n interval - messages in a time interval\n"
 							+ " image - full size image of a message");
@@ -369,7 +404,7 @@ public class Client {
 						client.manageGetImage(messageId);
 					} else
 						System.out.println(" Wrong choice.");
-				} else if(command.equalsIgnoreCase("my identity")) {
+				} else if(command.equalsIgnoreCase("me")) {
 					client.displayUserInfo();
 				} else {
 					System.out.println("Invalid command.");
@@ -379,7 +414,6 @@ public class Client {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			
 		}
 	}
 }

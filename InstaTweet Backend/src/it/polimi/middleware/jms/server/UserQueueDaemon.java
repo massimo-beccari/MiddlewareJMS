@@ -2,7 +2,9 @@ package it.polimi.middleware.jms.server;
 
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 
+import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
@@ -10,6 +12,7 @@ import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Queue;
 import javax.jms.Topic;
+import javax.naming.Context;
 import javax.naming.NamingException;
 
 import it.polimi.middleware.jms.Constants;
@@ -29,14 +32,17 @@ public class UserQueueDaemon implements Runnable {
 	private JMSProducer jmsProducer;
 	private ArrayList<JMSConsumer> messageConsumers;
 	private ArrayList<JMSConsumer> imageConsumers;
+	private HashMap<Integer, JMSConsumer> messageConsumersMap;
+	private HashMap<Integer, JMSConsumer> imageConsumersMap;
 	private boolean iWait;
 
-	public UserQueueDaemon(JMSContext jmsContext, int userId, IdDistributor messageIdDistributor) {
-		this.jmsContext = jmsContext;
+	public UserQueueDaemon(int userId, IdDistributor messageIdDistributor) {
 		this.userId = userId;
 		this.messageIdDistributor = messageIdDistributor;
 		messageConsumers = new ArrayList<JMSConsumer>();
 		imageConsumers = new ArrayList<JMSConsumer>();
+		messageConsumersMap = new HashMap<Integer, JMSConsumer>();
+		imageConsumersMap = new HashMap<Integer, JMSConsumer>();
 		iWait = false;
 	}
 	
@@ -45,9 +51,16 @@ public class UserQueueDaemon implements Runnable {
 	 */
 
 	private void setup() throws NamingException {
+		createContexts();
 		userMessagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_MESSAGES_PREFIX + userId);
 		userImagesQueue = jmsContext.createQueue(Constants.QUEUE_TO_USER_IMAGES_PREFIX + userId);
 		jmsProducer = jmsContext.createProducer();
+	}
+	
+	private void createContexts() throws NamingException {
+		Context initialContext = Utils.getContext();
+		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
+		jmsContext.setClientID("DAEMON_" + userId);
 	}
 	
 	/*
@@ -142,8 +155,20 @@ public class UserQueueDaemon implements Runnable {
 		newMessageConsumer = jmsContext.createDurableConsumer(newMessageTopic, Constants.TOPIC_SUBSCRIPTION_MESSAGES_PREFIX + userId + "_" + followedUserId);
 		newImageConsumer = jmsContext.createDurableConsumer(newImageTopic, Constants.TOPIC_SUBSCRIPTION_IMAGES_PREFIX + userId + "_" + followedUserId);
 		messageConsumers.add(newMessageConsumer);
+		messageConsumersMap.put(followedUserId, newMessageConsumer);
 		imageConsumers.add(newImageConsumer);
+		imageConsumersMap.put(followedUserId, newImageConsumer);
 		System.out.println("QD" + userId + ": subscription added to user " + followedUserId + ".");
+	}
+	
+	public void removeSubscription(int followedUserId) {
+		messageConsumersMap.get(followedUserId).close();
+		imageConsumersMap.get(followedUserId).close();
+		messageConsumers.remove(messageConsumersMap.get(followedUserId));
+		imageConsumers.remove(imageConsumersMap.get(followedUserId));
+		jmsContext.unsubscribe(Constants.TOPIC_SUBSCRIPTION_MESSAGES_PREFIX + userId + "_" + followedUserId);
+		jmsContext.unsubscribe(Constants.TOPIC_SUBSCRIPTION_IMAGES_PREFIX + userId + "_" + followedUserId);
+		System.out.println("QD" + userId + ": subscription removed to user " + followedUserId + ".");
 	}
 	
 	public void setNewSubscription(boolean newSubscription) {

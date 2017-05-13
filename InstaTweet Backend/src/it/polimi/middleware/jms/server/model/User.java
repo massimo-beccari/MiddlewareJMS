@@ -1,6 +1,7 @@
 package it.polimi.middleware.jms.server.model;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class User {
 	private int userId;
@@ -38,11 +39,26 @@ public class User {
 	public synchronized ArrayList<Integer> getFollowedUsers() {
 		 ArrayList<Integer> copy = new ArrayList<Integer>();
 		 copy.addAll(followedUsers);
-		return copy;
+		 return copy;
 	}
 	
 	public synchronized void addFollowed(int userId) {
 		followedUsers.add(userId);
+	}
+	
+	public synchronized void removeFollowed(int userId) {
+		for(int i = 0; i < followedUsers.size(); i++)
+			if(followedUsers.get(i) == userId)
+				followedUsers.remove(i);
+	}
+	
+	public synchronized boolean getIfFollowing(int userId) {
+		boolean following = false;
+		Iterator<Integer> it;
+		for(it = followedUsers.iterator(); !following && it.hasNext(); )
+			if(it.next().intValue() == userId)
+				following = true;
+		return following;
 	}
 	
 	public synchronized long getLastMessageReadTimestamp() {

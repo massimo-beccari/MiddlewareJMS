@@ -87,7 +87,6 @@ public class Utils {
 				scale = Constants.THUMBNAIL_MAX_DIMENSION/((float)img.getWidth());
 			else
 				scale = Constants.THUMBNAIL_MAX_DIMENSION/((float)img.getHeight());
-			System.out.println(scale + " " + (int) (img.getWidth()*scale) + " " + (int) (img.getHeight()*scale));
 			//create thumbnail image
 			thumbImg = new BufferedImage((int) (img.getWidth()*scale), (int) (img.getHeight()*scale), BufferedImage.TYPE_INT_ARGB);
 			AffineTransform at = new AffineTransform();
@@ -139,7 +138,7 @@ public class Utils {
 		sc.useDelimiter(":");
 		s = sc.next();
 		hours = Integer.parseInt(s);
-		if(hours < 0) {
+		if(hours < 0 || hours > 23) {
 			sc.close();
 			throw new Exception();
 		}
@@ -153,6 +152,14 @@ public class Utils {
 		Calendar cal = Calendar.getInstance();
 		cal.set(year, month-1, day, hours, minutes, 0);
 		return cal.getTimeInMillis();
+	}
+	
+	public static String getStringTimeFromLong(long time) {
+		Calendar cal = Calendar.getInstance();
+		cal.setTimeInMillis(time);
+		return cal.get(Calendar.DAY_OF_MONTH) + "/" + (cal.get(Calendar.MONTH) + 1) + "/" +
+		cal.get(Calendar.YEAR) + " " + cal.get(Calendar.HOUR_OF_DAY) + ":" +
+		cal.get(Calendar.MINUTE);
 	}
 	
 	//TEST MAIN

@@ -73,38 +73,91 @@ public class ServerInstance implements Runnable {
 			RequestMessage request = msg.getBody(RequestMessage.class);
 			Queue responseQueue = (Queue) msg.getJMSReplyTo();
 			System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": requests received.");
+			//find the user of the request
+			User user;
+			synchronized(usersMapUsername) {
+				user = usersMapId.get(request.getUserId());
+			}
+			//process request
 			switch(request.getRequestCode()) {
 			
 			case Constants.REQUEST_REGISTER:
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing registration...");
-				manageRegistration(request, responseQueue);
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": registration processed.");
+				if(user == null) {
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing registration...");
+					manageRegistration(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": registration processed.");
+				} else if(user.isLogged()) {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_ALREADY_AUTHENTICATED);
+					jmsProducer.send(responseQueue, response);
+				} else {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_BAD_ID);
+					jmsProducer.send(responseQueue, response);
+				}
 				break;
 				
 			case Constants.REQUEST_LOGIN:
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing login...");
-				manageLogin(request, responseQueue);
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": login processed.");
+				if(user == null) {
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing login...");
+					manageLogin(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": login processed.");
+				} else if(user.isLogged()) {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_ALREADY_AUTHENTICATED);
+					jmsProducer.send(responseQueue, response);
+				} else {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_BAD_ID);
+					jmsProducer.send(responseQueue, response);
+				}
 				break;
 				
 			case Constants.REQUEST_UNREGISTER:
-				
+				if(user != null && user.isLogged()) {
+					
+				} else {
+					sendNoLoggedResponse(responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+				}
 				break;
 				
 			case Constants.REQUEST_LOGOUT:
-				
+				if(user != null && user.isLogged()) {
+					
+				} else {
+					sendNoLoggedResponse(responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+				}
 				break;
 				
 			case Constants.REQUEST_FOLLOW:
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing follow...");
-				manageFollow(request, responseQueue);
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": follow processed.");
+				if(user != null && user.isLogged()) {
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing follow...");
+					manageFollow(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": follow processed.");
+				} else {
+					sendNoLoggedResponse(responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+				}
 				break;
 				
+			case Constants.REQUEST_UNFOLLOW:
+				if(user != null && user.isLogged()) {
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing unfollow...");
+					manageUnfollow(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": unfollow processed.");
+				} else {
+					sendNoLoggedResponse(responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+				}
+				break;	
+				
 			case Constants.REQUEST_GET:
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing get...");
-				manageGet(request, responseQueue);
-				System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": get processed.");
+				if(user != null && user.isLogged()) {
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing get...");
+					manageGet(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": get processed.");
+				} else {
+					sendNoLoggedResponse(responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+				}
 				break;
 			}
 		} catch (JMSException e) {
@@ -159,6 +212,7 @@ public class ServerInstance implements Runnable {
 			}
 			if(user != null && password.equals(user.getPassword())) {
 				sendOkResponse(responseQueue, "" + user.getUserId());
+				user.setLogged(true);
 				runHandler(user.getUserId());
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_AUTHENTICATION);
@@ -179,7 +233,7 @@ public class ServerInstance implements Runnable {
 	}
 	
 	private void runDaemon(int userId) {
-		UserQueueDaemon daemon = new UserQueueDaemon(jmsContext, userId, messageIdDistributor);
+		UserQueueDaemon daemon = new UserQueueDaemon(userId, messageIdDistributor);
 		synchronized(daemonsMap) {
 			daemonsMap.put(userId, daemon);
 		}
@@ -200,30 +254,95 @@ public class ServerInstance implements Runnable {
 				followedUserExists = usersMapUsername.containsKey(followedUsername);
 			}
 			if(followedUserExists && !(user.getUsername().equals(followedUsername))) {
-				UserQueueDaemon daemon;
-				synchronized(daemonsMap) {
-					daemon = daemonsMap.get(request.getUserId());
+				User followedUser;
+				synchronized(usersMapUsername) {
+					followedUser = usersMapUsername.get(followedUsername);
 				}
-				synchronized(daemon) {
-					daemon.setNewSubscription(true);
-					try {
-						daemon.wait();
-						User followedUser;
-						synchronized(usersMapUsername) {
-							followedUser = usersMapUsername.get(followedUsername);
+				int followedUserId = followedUser.getUserId();
+				if(!user.getIfFollowing(followedUserId)) {
+					UserQueueDaemon daemon;
+					synchronized(daemonsMap) {
+						daemon = daemonsMap.get(request.getUserId());
+					}
+					synchronized(daemon) {
+						daemon.setNewSubscription(true);
+						try {
+							daemon.wait();
+							daemon.addSubscription(followedUserId);
+							user.addFollowed(followedUserId);
+							daemon.setNewSubscription(false);
+							daemon.notify();
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						} catch (NamingException e) {
+							e.printStackTrace();
 						}
-						int followedUserId = followedUser.getUserId();
-						daemon.addSubscription(followedUserId);
-						user.addFollowed(followedUserId);
-						daemon.setNewSubscription(false);
-						daemon.notify();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					} catch (NamingException e) {
+					}
+					sendOkResponse(responseQueue, null);
+				} else {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_ALREADY_FOLLOWING);
+					try {
+						Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
+					} catch (JMSException e) {
 						e.printStackTrace();
 					}
 				}
-				sendOkResponse(responseQueue, null);
+			} else {
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_USERNAME);
+				try {
+					Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
+				} catch (JMSException e) {
+					e.printStackTrace();
+				}
+			}
+		} else
+			sendBadParamsResponse(responseQueue);
+	}
+	
+	private void manageUnfollow(RequestMessage request, Queue responseQueue) {
+		ArrayList<String> params = request.getRequestParams();
+		if(params != null && params.size() == 1) {
+			String followedUsername = params.get(0);
+			User user;
+			synchronized(usersMapId) {
+				user = usersMapId.get(request.getUserId());
+			}
+			boolean followedUserExists;
+			synchronized(usersMapUsername) {
+				followedUserExists = usersMapUsername.containsKey(followedUsername);
+			}
+			if(followedUserExists && !(user.getUsername().equals(followedUsername))) {
+				User followedUser;
+				synchronized(usersMapUsername) {
+					followedUser = usersMapUsername.get(followedUsername);
+				}
+				int followedUserId = followedUser.getUserId();
+				if(user.getIfFollowing(followedUserId)) {
+					UserQueueDaemon daemon;
+					synchronized(daemonsMap) {
+						daemon = daemonsMap.get(request.getUserId());
+					}
+					synchronized(daemon) {
+						daemon.setNewSubscription(true);
+						try {
+							daemon.wait();
+							daemon.removeSubscription(followedUserId);
+							user.removeFollowed(followedUserId);
+							daemon.setNewSubscription(false);
+							daemon.notify();
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					}
+					sendOkResponse(responseQueue, null);
+				} else {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_NOT_FOLLOWING);
+					try {
+						Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
+					} catch (JMSException e) {
+						e.printStackTrace();
+					}
+				}
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_USERNAME);
 				try {
@@ -312,7 +431,7 @@ public class ServerInstance implements Runnable {
 	}
 
 	private void manageGetFromIToJ(int userId, Queue responseQueue, long i, long j) {
-		if(j < i) {
+		if(j >= i) {
 			try {
 				Queue userMessagesQueue, destinationQueue;
 				boolean iSentSomething = false;
@@ -375,8 +494,10 @@ public class ServerInstance implements Runnable {
 				}
 				Utils.sendMessage(null, jmsContext, message, jmsProducer, destinationQueue, messageProperties, null);
 				sendOkResponse(responseQueue, null);
-			} else
-				sendBadParamsResponse(responseQueue);
+			} else {
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_WARNING, Constants.RESPONSE_INFO_NO_NEW_MESSAGES);
+				jmsProducer.send(responseQueue, response);
+			}
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
@@ -393,6 +514,15 @@ public class ServerInstance implements Runnable {
 
 	private void sendBadParamsResponse(Queue responseQueue) {
 		ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_BAD_PARAMS);
+		try {
+			Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
+		} catch (JMSException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void sendNoLoggedResponse(Queue responseQueue) {
+		ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_NOT_AUTHENTICATED);
 		try {
 			Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
 		} catch (JMSException e) {
