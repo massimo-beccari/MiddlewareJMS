@@ -3,6 +3,7 @@ package it.polimi.middleware.jms;
 public final class Constants {
 	public static final int SERVER_CHECK_LOAD_TIME_INTERVAL = 30000;
 	public static final int SERVER_MAX_LOAD_THRESOLD = 10;
+	public static final int SERVER_LOGIN_TIMEOUT_INTERVAL = 300000;
 	
 	public static final int THUMBNAIL_MAX_DIMENSION = 64;
 	
@@ -32,6 +33,7 @@ public final class Constants {
 	public static final String RESPONSE_INFO_USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS";
 	public static final String RESPONSE_INFO_WRONG_AUTHENTICATION = "USER_DOESNT_EXISTS_OR_WRONG_PASSWORD";
 	public static final String RESPONSE_INFO_WRONG_USERNAME = "USER_DOESNT_EXISTS_OR_IS_YOU";
+	public static final String RESPONSE_INFO_USER_ALREADY_LOGGED = "USER_ALREADY_LOGGED";
 	public static final String RESPONSE_INFO_ALREADY_FOLLOWING = "YOU_ARE_ALREADY_FOLLOWING_THAT_USER";
 	public static final String RESPONSE_INFO_USER_NOT_AUTHENTICATED = "YOU_ARE_NOT_AUTHENTICATED";
 	public static final String RESPONSE_INFO_USER_ALREADY_AUTHENTICATED = "YOU_ARE_ALREADY_LOGGED_:_FIRST_DO_LOGOUT";

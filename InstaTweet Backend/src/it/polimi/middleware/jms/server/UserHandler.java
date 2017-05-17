@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import it.polimi.middleware.jms.Constants;
 import it.polimi.middleware.jms.Utils;
 import it.polimi.middleware.jms.server.model.IdDistributor;
+import it.polimi.middleware.jms.server.model.User;
 import it.polimi.middleware.jms.server.model.message.GeneralMessage;
 import it.polimi.middleware.jms.server.model.message.ImageMessage;
 import it.polimi.middleware.jms.server.model.message.MessageProperty;
@@ -21,6 +22,7 @@ import javax.naming.NamingException;
 public class UserHandler implements Runnable {
 	private boolean isConnected;
 	private int userId;
+	private User user;
 	private IdDistributor messageIdDistributor;
 	private JMSContext jmsContext;
 	private Queue queueFromUser;
@@ -28,12 +30,15 @@ public class UserHandler implements Runnable {
 	private Topic userImageTopic;
 	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
+	private long lastInteractionTime;
 	
-	public UserHandler(JMSContext jmsContext, int userId, IdDistributor messageIdDistributor) {
+	public UserHandler(JMSContext jmsContext, User user, IdDistributor messageIdDistributor) {
 		this.jmsContext = jmsContext;
-		this.userId = userId;
+		this.userId = user.getUserId();
+		this.user = user;
 		this.messageIdDistributor = messageIdDistributor;
 		isConnected = true;
+		lastInteractionTime = System.currentTimeMillis();
 	}
 	
 	/*
@@ -61,23 +66,34 @@ public class UserHandler implements Runnable {
 		try {
 			setup();
 			System.out.println("UH" + userId + ": user handler started.");
-			while(isConnected) {
-				Message msg  = jmsConsumer.receive();
-				System.out.println("UH" + userId + ": message received.");
-				try {
-					GeneralMessage message = msg.getBody(GeneralMessage.class);
-					if(message.getType() == Constants.MESSAGE_ONLY_TEXT) {
-						processTextMessage(message, msg.getJMSTimestamp());
-						System.out.println("UH" + userId + ": text message processed.");
-					} else {
-						processMessageWithImage(message, msg.getJMSTimestamp());
-						System.out.println("UH" + userId + ": text/image message processed.");
+			while(isConnected && ((System.currentTimeMillis() - lastInteractionTime) <= Constants.SERVER_LOGIN_TIMEOUT_INTERVAL)) {
+				synchronized(this) {
+					Message msg  = jmsConsumer.receiveNoWait();
+					if(msg != null) {
+						System.out.println("UH" + userId + ": message received.");
+						try {
+							GeneralMessage message = msg.getBody(GeneralMessage.class);
+							if(message.getType() == Constants.MESSAGE_ONLY_TEXT) {
+								processTextMessage(message, msg.getJMSTimestamp());
+								System.out.println("UH" + userId + ": text message processed.");
+							} else {
+								processMessageWithImage(message, msg.getJMSTimestamp());
+								System.out.println("UH" + userId + ": text/image message processed.");
+							}
+						} catch (JMSException e) {
+							e.printStackTrace();
+						}
+						lastInteractionTime = System.currentTimeMillis();
 					}
-				} catch (JMSException e) {
-					e.printStackTrace();
+					Thread.sleep(100);
 				}
 			}
+			jmsConsumer.close();
+			user.setLogged(false);
+			System.out.println("UH" + userId + ": user handler terminated.");
 		} catch (NamingException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
@@ -112,5 +128,9 @@ public class UserHandler implements Runnable {
 		} catch (JMSException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public synchronized void setConnected(boolean isConnected) {
+		this.isConnected = isConnected;
 	}
 }

@@ -34,12 +34,12 @@ public class Client {
 	private Queue responseQueue;
 	private Queue uploadQueue;
 	private Queue messageQueue;
-	private boolean logged;
+	//private boolean logged;
 	private int userId;
 	private String username;
 	
 	public Client() {
-		logged = false;
+		//logged = false;
 		userId = Constants.UNREGISTERED_USER_ID;
 		try {
 			setup();
@@ -59,8 +59,8 @@ public class Client {
 	
 	private void createSession() throws NamingException {
 		jmsContext = ((ConnectionFactory) initialContext.lookup("java:comp/DefaultJMSConnectionFactory")).createContext();
-		if(logged)
-			jmsContext.setClientID("CLIENT_" + userId);
+		/*if(logged)
+			jmsContext.setClientID("CLIENT_" + userId);*/
 		requestsQueue = jmsContext.createQueue(Constants.QUEUE_REQUESTS_NAME);
 		responseQueue = jmsContext.createTemporaryQueue();
 		responseConsumer = jmsContext.createConsumer(responseQueue);
@@ -72,6 +72,7 @@ public class Client {
 	 */
 	
 	private void register(String username, String password) {
+		userId = Constants.UNREGISTERED_USER_ID;
 		ArrayList<String> params = new ArrayList<String>();
 		params.add(username);
 		params.add(password);
@@ -81,7 +82,7 @@ public class Client {
 			Message msg = responseConsumer.receive();
 			ResponseMessage response = msg.getBody(ResponseMessage.class);
 			if(response.getResponseCode() == Constants.RESPONSE_OK) {
-				logged = true;
+				//logged = true;
 				this.username = username;
 				this.userId = Integer.parseInt(response.getResponseInfo());
 				System.out.println("Response: OK. Your id: " + response.getResponseInfo());
@@ -94,6 +95,7 @@ public class Client {
 	}
 	
 	private void login(String username, String password) {
+		userId = Constants.UNREGISTERED_USER_ID;
 		ArrayList<String> params = new ArrayList<String>();
 		params.add(username);
 		params.add(password);
@@ -103,21 +105,21 @@ public class Client {
 			Message msg = responseConsumer.receive();
 			ResponseMessage response = msg.getBody(ResponseMessage.class);
 			if(response.getResponseCode() == Constants.RESPONSE_OK) {
-				logged = true;
+				//logged = true;
 				this.username = username;
 				this.userId = Integer.parseInt(response.getResponseInfo());
-				//close old unidentified session and create a new one with client id
+				/*close old unidentified session and create a new one with client id
 				jmsContext.close();
-				createSession();
+				createSession();*/
 				System.out.println("Response: OK. Your id: " + response.getResponseInfo());
 				setupQueues();
 			} else
 				System.out.println("Response: ERROR: " + response.getResponseInfo());
 		} catch (JMSException e) {
 			e.printStackTrace();
-		} catch (NamingException e) {
+		} /*catch (NamingException e) {
 			e.printStackTrace();
-		}
+		}*/
 	}
 	
 	private void setupQueues() {
@@ -127,7 +129,7 @@ public class Client {
 	}
 	
 	private void follow(String followedUsername) {
-		if(logged) {
+		//if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(followedUsername);
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_FOLLOW, params);
@@ -142,12 +144,12 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 	
 	private void unfollow(String followedUsername) {
-		if(logged) {
+		//if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(followedUsername);
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_UNFOLLOW, params);
@@ -162,12 +164,12 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 	
 	private void post(String text, String imageFilePath) {
-		if(logged) {
+		//if(logged) {
 			try {
 				String extension = null;
 				byte[] image = null;
@@ -187,12 +189,12 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 
 	private void manageGetNew() {
-		if(logged) {
+		//if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(Constants.REQUEST_GET_ALL_NEW + "");
 			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_GET, params);
@@ -211,12 +213,12 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 
 	private void manageGetInterval(long i, long j) {
-		if(logged) {
+		//if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(Constants.REQUEST_GET_FROM_I_TO_J + "");
 			params.add(i + "");
@@ -237,12 +239,12 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 
 	private void manageGetImage(String messageId) {
-		if(logged) {
+		//if(logged) {
 			ArrayList<String> params = new ArrayList<String>();
 			params.add(Constants.REQUEST_GET_IMAGE + "");
 			params.add(messageId);
@@ -260,8 +262,8 @@ public class Client {
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 
 	private void getMessagesFromQueue(int type) {
@@ -325,12 +327,31 @@ public class Client {
 			}
 		}
 	}
+	
+	private void logout() {
+		//if(logged) {
+			RequestMessage request = new RequestMessage(userId, Constants.REQUEST_LOGOUT, null);
+			try {
+				Utils.sendMessage(null, jmsContext, request, jmsProducer, requestsQueue, null, responseQueue);
+				userId = Constants.UNREGISTERED_USER_ID;
+				Message msg = responseConsumer.receive();
+				ResponseMessage response = msg.getBody(ResponseMessage.class);
+				if(response.getResponseCode() == Constants.RESPONSE_OK) {
+					System.out.println("Response: OK.");
+				} else
+					System.out.println("Response: ERROR: " + response.getResponseInfo());
+			} catch (JMSException e) {
+				e.printStackTrace();
+			}
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
+	}
 
 	private void displayUserInfo() {
-		if(logged) {
+		//if(logged) {
 			System.out.println("You are logged as id: " + userId + ", username: " + username);
-		} else
-			System.out.println("Error: you are not logged in. First login to the system.");
+		/*} else
+			System.out.println("Error: you are not logged in. First login to the system.");*/
 	}
 	
 	private void close() {
@@ -343,7 +364,7 @@ public class Client {
 		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
 			try {
-				System.out.println("Commands:\nr register\nl login\nf follow\nuf unfollow\np post\ng get\nme my identity");
+				System.out.println("Commands:\nr register\nli login\nf follow\nuf unfollow\np post\ng get\nlo logout\nme my identity");
 				command = bufferedReader.readLine();
 				if(command.equalsIgnoreCase("exit")) {
 					client.close();
@@ -355,7 +376,7 @@ public class Client {
 					System.out.println(" Password:");
 					password = bufferedReader.readLine();
 					client.register(username, password);
-				} else if(command.equalsIgnoreCase("l")) {
+				} else if(command.equalsIgnoreCase("li")) {
 					String username, password;
 					System.out.println(" Username:");
 					username = bufferedReader.readLine();
@@ -404,6 +425,8 @@ public class Client {
 						client.manageGetImage(messageId);
 					} else
 						System.out.println(" Wrong choice.");
+				} else if(command.equalsIgnoreCase("lo")) {
+					client.logout();
 				} else if(command.equalsIgnoreCase("me")) {
 					client.displayUserInfo();
 				} else {

@@ -26,6 +26,7 @@ public class Server {
 	private IdDistributor messageIdDistributor;
 	private HashMap<Integer, User> usersMapId;
 	private HashMap<String, User> usersMapUsername;
+	private HashMap<Integer, UserHandler> handlersMap;
 	private HashMap<Integer, UserQueueDaemon> daemonsMap;
 	private ExecutorService executor;
 	private Context initialContext;
@@ -40,6 +41,7 @@ public class Server {
 		messageIdDistributor = new IdDistributor(1);
 		usersMapId = new HashMap<Integer, User>();
 		usersMapUsername = new HashMap<String, User>();
+		handlersMap = new HashMap<Integer, UserHandler>();
 		daemonsMap = new HashMap<Integer, UserQueueDaemon>();
 		executor = Executors.newCachedThreadPool();
 		serverInstances = new ArrayList<ServerInstance>();
@@ -64,7 +66,7 @@ public class Server {
 		currentNumberOfServerInstances++;
 		ServerInstance firstInstance = new ServerInstance(currentNumberOfServerInstances,
 				jmsContext, userIdDistributor, messageIdDistributor, usersMapId, 
-				usersMapUsername, daemonsMap);
+				usersMapUsername, daemonsMap, handlersMap);
 		serverInstances.add(firstInstance);
 		executor.submit(firstInstance);
 		System.out.println("SRV: new server instance launched. (" + currentNumberOfServerInstances + ")");

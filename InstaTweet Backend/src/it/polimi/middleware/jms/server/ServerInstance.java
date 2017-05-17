@@ -29,6 +29,7 @@ public class ServerInstance implements Runnable {
 	private IdDistributor messageIdDistributor;
 	private HashMap<Integer, User> usersMapId;
 	private HashMap<String, User> usersMapUsername;
+	private HashMap<Integer, UserHandler> handlersMap;
 	private HashMap<Integer, UserQueueDaemon> daemonsMap;
 	private JMSContext jmsContext;
 	private JMSConsumer jmsConsumer;
@@ -37,14 +38,15 @@ public class ServerInstance implements Runnable {
 	
 	public ServerInstance(int SERVER_INSTANCE_NUMBER, JMSContext jmsContext,
 			IdDistributor userIdDistributor, IdDistributor messageIdDistributor, HashMap<Integer, User> usersMapId,
-			HashMap<String, User> usersMapUsername,
-			HashMap<Integer, UserQueueDaemon> daemonsMap) {
+			HashMap<String, User> usersMapUsername, HashMap<Integer, UserQueueDaemon> daemonsMap,
+			HashMap<Integer, UserHandler> handlersMap) {
 		this.SERVER_INSTANCE_NUMBER = SERVER_INSTANCE_NUMBER;
 		this.jmsContext = jmsContext;
 		this.userIdDistributor = userIdDistributor;
 		this.messageIdDistributor = messageIdDistributor;
 		this.usersMapId = usersMapId;
 		this.usersMapUsername = usersMapUsername;
+		this.handlersMap = handlersMap;
 		this.daemonsMap = daemonsMap;
 	}
 	
@@ -114,16 +116,18 @@ public class ServerInstance implements Runnable {
 					
 				} else {
 					sendNoLoggedResponse(responseQueue);
-					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INVALID USER.");
 				}
 				break;
 				
 			case Constants.REQUEST_LOGOUT:
 				if(user != null && user.isLogged()) {
-					
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": processing logout...");
+					manageLogout(request, responseQueue);
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": logout processed.");
 				} else {
 					sendNoLoggedResponse(responseQueue);
-					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INVALID USER.");
 				}
 				break;
 				
@@ -134,7 +138,7 @@ public class ServerInstance implements Runnable {
 					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": follow processed.");
 				} else {
 					sendNoLoggedResponse(responseQueue);
-					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INVALID USER.");
 				}
 				break;
 				
@@ -145,7 +149,7 @@ public class ServerInstance implements Runnable {
 					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": unfollow processed.");
 				} else {
 					sendNoLoggedResponse(responseQueue);
-					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INVALID USER.");
 				}
 				break;	
 				
@@ -156,7 +160,7 @@ public class ServerInstance implements Runnable {
 					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": get processed.");
 				} else {
 					sendNoLoggedResponse(responseQueue);
-					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INAVLID USER.");
+					System.out.println("SI" + SERVER_INSTANCE_NUMBER + ": REQUEST RECEIVED FROM INVALID USER.");
 				}
 				break;
 			}
@@ -186,7 +190,7 @@ public class ServerInstance implements Runnable {
 					usersMapUsername.put(username, newUser);
 				}
 				sendOkResponse(responseQueue, "" + userId);
-				runHandler(userId);
+				runHandler(newUser);
 				runDaemon(userId);
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_ALREADY_EXISTS);
@@ -211,9 +215,18 @@ public class ServerInstance implements Runnable {
 				user = usersMapUsername.get(username);
 			}
 			if(user != null && password.equals(user.getPassword())) {
-				sendOkResponse(responseQueue, "" + user.getUserId());
-				user.setLogged(true);
-				runHandler(user.getUserId());
+				if(!(user.isLogged())) {
+					sendOkResponse(responseQueue, "" + user.getUserId());
+					user.setLogged(true);
+					runHandler(user);
+				} else {
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_USER_ALREADY_LOGGED);
+					try {
+						Utils.sendMessage(null, jmsContext, response, jmsProducer, responseQueue, null, null);
+					} catch (JMSException e) {
+						e.printStackTrace();
+					}
+				}
 			} else {
 				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_WRONG_AUTHENTICATION);
 				try {
@@ -226,8 +239,9 @@ public class ServerInstance implements Runnable {
 			sendBadParamsResponse(responseQueue);
 	}
 	
-	private void runHandler(int userId) {
-		UserHandler handler = new UserHandler(jmsContext, userId, messageIdDistributor);
+	private void runHandler(User user) {
+		UserHandler handler = new UserHandler(jmsContext, user, messageIdDistributor);
+		handlersMap.put(user.getUserId(), handler);
 		Thread t = new Thread(handler);
 		t.start();
 	}
@@ -239,6 +253,15 @@ public class ServerInstance implements Runnable {
 		}
 		Thread t = new Thread(daemon);
 		t.start();
+	}
+
+	private void manageLogout(RequestMessage request, Queue responseQueue) {
+		UserHandler handler;
+		synchronized(handlersMap) {
+			handler = handlersMap.get(request.getUserId());
+		}
+		handler.setConnected(false);
+		sendOkResponse(responseQueue, null);
 	}
 	
 	private void manageFollow(RequestMessage request, Queue responseQueue) {
@@ -461,7 +484,7 @@ public class ServerInstance implements Runnable {
 				if(iSentSomething)
 					sendOkResponse(responseQueue, null);
 				else {
-					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_WARNING, Constants.RESPONSE_INFO_NO_NEW_MESSAGES);
+					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_WARNING, Constants.RESPONSE_INFO_NO_MESSAGES);
 					jmsProducer.send(responseQueue, response);
 				}
 			} catch (JMSException e) {
@@ -495,7 +518,7 @@ public class ServerInstance implements Runnable {
 				Utils.sendMessage(null, jmsContext, message, jmsProducer, destinationQueue, messageProperties, null);
 				sendOkResponse(responseQueue, null);
 			} else {
-				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_WARNING, Constants.RESPONSE_INFO_NO_NEW_MESSAGES);
+				ResponseMessage response = new ResponseMessage(Constants.RESPONSE_WARNING, Constants.RESPONSE_INFO_NO_IMAGES_WITH_ID);
 				jmsProducer.send(responseQueue, response);
 			}
 		} catch (JMSException e) {
