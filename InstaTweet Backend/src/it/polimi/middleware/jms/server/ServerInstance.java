@@ -287,20 +287,8 @@ public class ServerInstance implements Runnable {
 					synchronized(daemonsMap) {
 						daemon = daemonsMap.get(request.getUserId());
 					}
-					synchronized(daemon) {
-						daemon.setNewSubscription(true);
-						try {
-							daemon.wait();
-							daemon.addSubscription(followedUserId);
-							user.addFollowed(followedUserId);
-							daemon.setNewSubscription(false);
-							daemon.notify();
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						} catch (NamingException e) {
-							e.printStackTrace();
-						}
-					}
+					daemon.addSubscription(followedUserId);
+					user.addFollowed(followedUserId);
 					sendOkResponse(responseQueue, null);
 				} else {
 					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_ALREADY_FOLLOWING);
@@ -345,18 +333,8 @@ public class ServerInstance implements Runnable {
 					synchronized(daemonsMap) {
 						daemon = daemonsMap.get(request.getUserId());
 					}
-					synchronized(daemon) {
-						daemon.setNewSubscription(true);
-						try {
-							daemon.wait();
-							daemon.removeSubscription(followedUserId);
-							user.removeFollowed(followedUserId);
-							daemon.setNewSubscription(false);
-							daemon.notify();
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
+					daemon.removeSubscription(followedUserId);
+					user.removeFollowed(followedUserId);
 					sendOkResponse(responseQueue, null);
 				} else {
 					ResponseMessage response = new ResponseMessage(Constants.RESPONSE_ERROR, Constants.RESPONSE_INFO_NOT_FOLLOWING);

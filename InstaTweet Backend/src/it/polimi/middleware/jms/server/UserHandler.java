@@ -30,7 +30,7 @@ public class UserHandler implements Runnable {
 	private Topic userImageTopic;
 	private JMSConsumer jmsConsumer;
 	private JMSProducer jmsProducer;
-	private long lastInteractionTime;
+	//private long lastInteractionTime;
 	
 	public UserHandler(JMSContext jmsContext, User user, IdDistributor messageIdDistributor) {
 		this.jmsContext = jmsContext;
@@ -38,7 +38,7 @@ public class UserHandler implements Runnable {
 		this.user = user;
 		this.messageIdDistributor = messageIdDistributor;
 		isConnected = true;
-		lastInteractionTime = System.currentTimeMillis();
+		//lastInteractionTime = System.currentTimeMillis();
 	}
 	
 	/*
@@ -66,7 +66,7 @@ public class UserHandler implements Runnable {
 		try {
 			setup();
 			System.out.println("UH" + userId + ": user handler started.");
-			while(isConnected && ((System.currentTimeMillis() - lastInteractionTime) <= Constants.SERVER_LOGIN_TIMEOUT_INTERVAL)) {
+			while(isConnected /*&& ((System.currentTimeMillis() - lastInteractionTime) <= Constants.SERVER_LOGIN_TIMEOUT_INTERVAL)*/) {
 				synchronized(this) {
 					Message msg  = jmsConsumer.receiveNoWait();
 					if(msg != null) {
@@ -83,7 +83,7 @@ public class UserHandler implements Runnable {
 						} catch (JMSException e) {
 							e.printStackTrace();
 						}
-						lastInteractionTime = System.currentTimeMillis();
+						//lastInteractionTime = System.currentTimeMillis();
 					}
 					Thread.sleep(100);
 				}

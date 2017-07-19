@@ -34,7 +34,6 @@ public class UserQueueDaemon implements Runnable {
 	private ArrayList<JMSConsumer> imageConsumers;
 	private HashMap<Integer, JMSConsumer> messageConsumersMap;
 	private HashMap<Integer, JMSConsumer> imageConsumersMap;
-	private boolean iWait;
 
 	public UserQueueDaemon(int userId, IdDistributor messageIdDistributor) {
 		this.userId = userId;
@@ -43,7 +42,6 @@ public class UserQueueDaemon implements Runnable {
 		imageConsumers = new ArrayList<JMSConsumer>();
 		messageConsumersMap = new HashMap<Integer, JMSConsumer>();
 		imageConsumersMap = new HashMap<Integer, JMSConsumer>();
-		iWait = false;
 	}
 	
 	/*
@@ -74,36 +72,29 @@ public class UserQueueDaemon implements Runnable {
 			System.out.println("QD" + userId + ": queue daemon started.");
 			while(true) {
 				synchronized(this) {
-					try {
-						//if new subscription, wake server and wait it adds new subscription
-						while(iWait) {
-							notify();
-							wait();
+					//check messages
+					for(JMSConsumer consumer : messageConsumers) {
+						Message message = consumer.receiveNoWait();
+						if(message != null) {
+							System.out.println("QD" + userId + ": message received.");
+							onMessage(message);
+							System.out.println("QD" + userId + ": message forwarded.");
 						}
-						//check messages
-						for(JMSConsumer consumer : messageConsumers) {
-							Message message = consumer.receiveNoWait();
-							if(message != null) {
-								System.out.println("QD" + userId + ": message received.");
-								onMessage(message);
-								System.out.println("QD" + userId + ": message forwarded.");
-							}
+					}
+					//check images
+					for(JMSConsumer consumer : imageConsumers) {
+						Message message = consumer.receiveNoWait();
+						if(message != null) {
+							System.out.println("QD" + userId + ": message received.");
+							onImage(message);
+							System.out.println("QD" + userId + ": message forwarded.");
 						}
-						//check images
-						for(JMSConsumer consumer : imageConsumers) {
-							Message message = consumer.receiveNoWait();
-							if(message != null) {
-								System.out.println("QD" + userId + ": message received.");
-								onImage(message);
-								System.out.println("QD" + userId + ": message forwarded.");
-							}
-						}
-						//sleep
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
 					}
 				}
+				//sleep
+				try {
+					Thread.sleep(100);
+				} catch(InterruptedException e) {}
 			}
 		} catch (NamingException e) {
 			e.printStackTrace();
@@ -147,7 +138,7 @@ public class UserQueueDaemon implements Runnable {
 		}
 	}
 	
-	public void addSubscription(int followedUserId) throws NamingException {
+	public synchronized void addSubscription(int followedUserId) {
 		Topic newMessageTopic, newImageTopic;
 		newMessageTopic = jmsContext.createTopic(Constants.TOPIC_USER_MESSAGES_PREFIX + followedUserId);
 		newImageTopic = jmsContext.createTopic(Constants.TOPIC_USER_IMAGES_PREFIX + followedUserId);
@@ -161,7 +152,7 @@ public class UserQueueDaemon implements Runnable {
 		System.out.println("QD" + userId + ": subscription added to user " + followedUserId + ".");
 	}
 	
-	public void removeSubscription(int followedUserId) {
+	public synchronized void removeSubscription(int followedUserId) {
 		messageConsumersMap.get(followedUserId).close();
 		imageConsumersMap.get(followedUserId).close();
 		messageConsumers.remove(messageConsumersMap.get(followedUserId));
@@ -169,9 +160,5 @@ public class UserQueueDaemon implements Runnable {
 		jmsContext.unsubscribe(Constants.TOPIC_SUBSCRIPTION_MESSAGES_PREFIX + userId + "_" + followedUserId);
 		jmsContext.unsubscribe(Constants.TOPIC_SUBSCRIPTION_IMAGES_PREFIX + userId + "_" + followedUserId);
 		System.out.println("QD" + userId + ": subscription removed to user " + followedUserId + ".");
-	}
-	
-	public void setNewSubscription(boolean newSubscription) {
-		this.iWait = newSubscription;
 	}
 }
