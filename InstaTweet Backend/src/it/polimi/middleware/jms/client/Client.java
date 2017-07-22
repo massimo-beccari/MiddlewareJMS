@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Properties;
 
 import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
@@ -22,9 +23,11 @@ import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Queue;
 import javax.naming.Context;
+import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
 public class Client {
+	private String url;
 	private Context initialContext;
 	private JMSContext jmsContext;
 	private JMSProducer jmsProducer;
@@ -38,7 +41,8 @@ public class Client {
 	private int userId;
 	private String username;
 	
-	public Client() {
+	public Client(String url) {
+		this.url = url;
 		//logged = false;
 		userId = Constants.UNREGISTERED_USER_ID;
 		try {
@@ -53,8 +57,16 @@ public class Client {
 	 */
 
 	private void setup() throws NamingException {
-		initialContext = Utils.getContext();
+		initialContext = getContext();
 		createSession();
+	}
+	
+	public Context getContext() throws NamingException {
+		Properties props = new Properties();
+		props.setProperty("java.naming.factory.initial", "com.sun.enterprise.naming.SerialInitContextFactory");
+		props.setProperty("java.naming.factory.url.pkgs", "com.sun.enterprise.naming");
+		props.setProperty("java.naming.provider.url", "iiop://" + url);
+		return new InitialContext(props);
 	}
 	
 	private void createSession() throws NamingException {
@@ -359,7 +371,11 @@ public class Client {
 	}
 	
 	public static void main(String[] args) {
-		Client client = new Client();
+		Client client;
+		if(args[0] != null)
+			client = new Client(args[0]);
+		else
+			client = new Client("localhost:3700");
 		String command;
 		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
