@@ -65,7 +65,8 @@ public class Client {
 		Properties props = new Properties();
 		props.setProperty("java.naming.factory.initial", "com.sun.enterprise.naming.SerialInitContextFactory");
 		props.setProperty("java.naming.factory.url.pkgs", "com.sun.enterprise.naming");
-		props.setProperty("java.naming.provider.url", "iiop://" + url);
+		props.put("org.omg.CORBA.ORBInitialHost", url);
+		props.put("org.omg.CORBA.ORBInitialPort", "3700");
 		return new InitialContext(props);
 	}
 	
@@ -372,7 +373,7 @@ public class Client {
 	
 	public static void main(String[] args) {
 		Client client;
-		if(args[0] != null)
+		if(args.length > 0)
 			client = new Client(args[0]);
 		else
 			client = new Client("localhost:3700");
