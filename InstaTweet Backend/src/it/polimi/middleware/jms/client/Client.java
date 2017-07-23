@@ -65,8 +65,9 @@ public class Client {
 		Properties props = new Properties();
 		props.setProperty("java.naming.factory.initial", "com.sun.enterprise.naming.SerialInitContextFactory");
 		props.setProperty("java.naming.factory.url.pkgs", "com.sun.enterprise.naming");
-		props.put("org.omg.CORBA.ORBInitialHost", url);
-		props.put("org.omg.CORBA.ORBInitialPort", "3700");
+		props.setProperty("java.naming.factory.state", "com.sun.corba.ee.impl.presentation.rmi.JNDIStateFactoryImpl");
+		props.setProperty("org.omg.CORBA.ORBInitialHost", url);
+		props.setProperty("org.omg.CORBA.ORBInitialPort", "3700");
 		return new InitialContext(props);
 	}
 	
@@ -376,7 +377,7 @@ public class Client {
 		if(args.length > 0)
 			client = new Client(args[0]);
 		else
-			client = new Client("localhost:3700");
+			client = new Client("localhost");
 		String command;
 		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
